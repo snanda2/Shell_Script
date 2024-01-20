@@ -94,10 +94,10 @@ for entry in data_sorted:
 csv_file_path = Path(previous_output_file_path).parent / 'input.csv'
 
 # Specify the output JSON file path in the same location as the input CSV file
-output_json_file_path = Path(csv_file_path).with_name('output.json')
+output_json_file_path = csv_file_path.with_name('output.json')
 
 # Specify the output HTML file path in the same location as the input CSV file
-output_html_file_path = Path(csv_file_path).with_name('output_table.html')
+output_html_file_path = csv_file_path.with_name('output_table.html')
 
 # Create HTML table with start and end times for each log type
 html_table = f"""
