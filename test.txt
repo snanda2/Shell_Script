@@ -1,0 +1,135 @@
+24.01.22 21:00:35.353938440 [	shc:2979301][_AAoAAvCjZa9H8gAC_]I-SHC-5072: insert cost [4]
+24.01.22 21:00:35.386463164 [	shc:2979301][_AAoAAvCjZa9H8gAC_]I-SHC-9814: commit cost [4]
+24.01.22 21:00:35.386503364 [	shc:2979301][_AAoAAvCj Za 9H8gAC_]I-SHC-031029: action: Return to sender
+24.01.22 21:00:35.386558463 [	shc:2979301][_AAoAAvCjZa9H8gAC_]L-SHC-031040: Sent msg ID [AAoAAVCjZa9H8gAC] /m0210/t524232/p003000 to shcfmt
+24.01.22 21:00:35.386618762 [	shc:2979301][_AAoAAvCj Za 9H8gAC_]I-SHC-030010: Route: m0210/a	000001/i	72/t524232/p003000/r00/c4060********7673 -->(184)
+24.01.22 21:00:35.390367219 [	shc:2979301][_AAoAAvCjZa9H8gAC_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:35.390378219 [	shc:2979301][_AAoAAvCjZa9H8gAC_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:35.390430818 [	shc:2979301][_AAoAAvCjZa9H8gAC_]I-SHC-9829: Messages out at 1705986035 390
+24.01.22 21:00:35.425110917 [	shc:193100][_AAoAAVCjZa9H8wAA_]L-SHC-13208: Received 8824 bytes from shcfmt ID [AAoAAVCjZa9H8wAA]/m0120/t492792/p1130 at 1705986035 425
+24.01.22 21:00:35.425152716	[	shc:193100][_AAoAAvCjZa9H8wAA_]I-SHC-13213: Got request from (184)
+24.01.22 21:00:35.425175116 [	shc:193100][_AAoAAvCjZa9H8WAA_]I-SHC-13216: THROTTLE: Continue processing.
+24.01.22 21:00:35.429100071 [	shc:193100][_AAoAAvCjZa9H8wAA_]W-SEG2-007004: Unsupported segment/ELF ID [] ignored.
+24.01.22 21:00:35.429115171 [	shc:193100][_AAoAAvCjZa9H8wAA_]E-SEG2-010015: can't map <> to id, skip.
+24.01.22 21:00:35.429151070 [	shc:193100][_AAoAAvCjZa9H8wAA_]I-SHC-027021: Can't find shckeys record (,)
+24.01.22 21:00:35.429189970	[	shc:193100][_AAoAAvCjZa9H8wAA_1I-SHC-14511: Setup originator field in shcmsg
+24.01.22 21:00:35.429205270 [	shc:193100][_AAoAAvCjZa9H8wAA_] E-BUSDAY-102.1: business day profile is empty
+24.01.22 21:00:35.429212269 [	shc:193100][_AAoAAvCjZa9H8WAA_]I-SHC-14512: Process Bus Date [4] [-1]
+24.01.22 21:00:35.429220469 [	shc:193100][_AAoAAvCjZa9H8WAA_1I-SHC-14514: Perform currency conversion
+24.01.22 21:00:35.429232269 [	shc:193100][_AAoAAvCjZa9H8wAA ]I-SHC-074002: (header) enrich (iss= 		72, acq=	000001),(txnSrc=FISACQ, txnDest=CHASEPT)
+24.01.22 21:00:35.447440559 [	shc:193100][_AAoAAvCjZa 9H8wAA_]W-SHC-032007: refnum: not found
+24.01.22 21:00:35.447467158 [	shc:193100][_AAoAAvCjZa 9H8wAA_]I-SHCLOG-5064:1:0 fd:0
+24.01.22 21:00:35.460323410 [	shc:193100][_AAoAAvCj2a9H8wAA_]I-SHC-032005:	result: not found
+24.01.22 21:00:35.460382209 [	shc:193100][_AAoAAvCjZa9H8WAA_]I-SHC-074006: ShcFinAuthReq::edit()
+24.01.22 21:00:35.460401109 [	shc: 193100][_AAoAAvCjZa9H8WAA_]I-SHC-074008: Continue ShcFinAuthReq::edit ()
+24.01.22 21:00:35.460421008 [	shc:193100][_AAoAAvCjZa9H8WAA_]I-SHC-073001: msgtype='220',and pcode='113000', no 0 amt check 
+24.01.22 21:00:35.460441308 [	shc:193100][_AAoAAvCjZa 9H8WAA_]I-SHC-074011: edit (): Normal exit.
+24.01.22 21:00:35.460468908	[	shc:193100][_AAoAAvCjZa9H8wAA_]I-SHC-030002: Update Stats for 120 msg and Resp (-1)
+24.01.22 21:00:35.460498808 [	shc: 193100][_AAoAAvCj Za 9H8wAA_]W-SEG-017001: buffer len (-1) less than data len (0), ID [483]
+24.01.22 21:00:35.461387997 [	shc: 193100][_AAoAAvCjZa9H8wAA_]I-SHC-5072: insert cost [0]
+24.01.22 21:00:35.471361482 [	shc: 193100][_AAoAAVCjZa9H8wAA_]I-SHC-9814: commit cost [10]
+24.01.22 21:00:35.471445281 [	shc:193100][_AAoAAvCj Za 9H8wAA_]I-SHC-031028:	action : Send to issuer
+24.01.22 21:00:35.471487280	[	shc: 193100][_AAoAAvCj Za 9H8wAA_]L-SHC-031040: Sent msg ID [AAoAAvCjZa9H8wAA] /m0120/t492792/p113000 to Chase Pns Formatter
+24.01.22 21:00:35.471501680 [	shc:193100][_AAoAAvCj Za9H8wAA_]I-SHC-030010: Route: m0120/a	000001/i		72/t492792/p113000/r00/c4984********6535 -->(119)
+24.01.22 21:00:35.475307336 [	shc:193100][_AAoAAvCjZa9H8wAA_]I-SHC-9829: Messages out at 1705986035 475
+24.01.22 21:00:35.702367610 [	shc:193105][_AAoAAvCjZa9H8wAA_]L-SHC-13208: Received 9472 bytes from Chase PnsFormatter ID [AAoAAVCjZa9H8wAA]/m0130/t492792/p113000 at 1705986035	702
+24.01.22 21:00:35.702422609 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-13213: Got request from (119)
+24.01.22 21:00:35.702445009 [	shc:193105][_AAoAAvCjZa 9H8WAA_]I-SHC-13216: THROTTLE: Continue processing.
+24.01.22 21:00:35.706465662 [	shc:193105][_AAoAAvCjZa9H8WAA_11-SHC-027021: Can't find shckeys record (,)
+24.01.22 21:00:35.706517262 [	shc: 193105][_AAoAAvCjZa9H8WAA_]I-SHC-14511: Setup originator field in shcmsg
+24.01.22 21:00:35.706536061 [	shc:193105][_AAoAAvCjZa9H8wAA_] D-SHC-073075 Response code is [00]
+24.01.22 21:00:35.706545261 [	shc:193105][_AAoAAvCjZa9H8WAA_1D-SHC-073075a stand_in_decision_rc_list: []
+24.01.22 21:00:35.706553461 [	shc:193105][_AAoAAvCjZa9H8WAA_]D-SHC-073075b stand_in_decision_timeout: [300]
+24.01.22 21:00:35.706585861 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-14514: Perform currency conversion
+24.01.22 21:00:35.706601161 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-075001: (header) enrich (iss=	72, acq= 000001), (txnSrc=FISACQ, txnDest=CHASEPT)
+24.01.22 21:00:35.706621260 [	shc:193105][_AAoAAvCjZa9H8wAA_]L-SHC-073044: Replace ID [AAoAAvCjZa9H8wAA] with ID [AAoAAvCjZa9H8wAA]
+24.01.22 21:00:35.723873761 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-030002: Update Stats for 130 msg and Resp (0)
+24.01.22 21:00:35.723924460 [	shc:193105][_AAoAAvCjZa9H8wAA_]W-SEG-017001: buffer len (-1) less than data len (0), ID [483]
+24.01.22 21:00:35.723943160 [	shc:193105][_AAoAAvCjZa9H8wAA_]W-SEG-017002: in Ist SegTLV:: flattenSegMemcpy, size of buf[-432] not passed 
+24.01.22 21:00:35.723955160 [	shc:193105][_AAoAAvCjZa9H8wAA_]W-SEG-017002: in Ist SegTLV:: flattenSegMemcpy, size of buf[-628] not passed 
+24.01.22 21:00:35.723965360 [	shc:193105][_AAoAAvCjZa9H8wAA_]W-SEG-017002: in IstSegTLV:: flattenSegMemcpy, size of buf[-645] not passed 
+24.01.22 21:00:35.723974160 [	shc:193105][_AAoAAvCjZa 9H8WAA_]W-SEG-017002: in IstSegTLV:: flattenSegMemcpy, size of buf[-724] not passed 
+24.01.22 21:00:35.723983659 [	shc:193105][_AAoAAvCjZa9H8wAA_]W-SEG-017002: in Ist SegTLV:: flatten SegMemcpy, size of buf[-894] not passed
+24.01.22 21:00:35.726640829 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-5072: insert cost [3] 
+24.01.22 21:00:35.730707082 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-9814: commit cost [4] 
+24.01.22 21:00:35.730730681 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-031029: action: Return to sender
+24.01.22 21:00:35.730770381 [	shc:193105][_AAoAAvCjZa9H8wAA_]L-SHC-031040: Sent msg ID [AAoAAvCjZa9H8wAA] /m0130/t492792/p113000 to shcfmt
+24.01.22 21:00:35.730829180 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-030010: Route: m0130/a 000001/i	72/t492792/p113000/r00/c4984********6535 -->(184)
+24.01.22 21:00:35.734605137 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:35.734616036 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:35.734665136 [	shc:193105][_AAoAAvCjZa9H8wAA_]I-SHC-9829: Messages out at 1705986035 735
+24.01.22 21:00:36.359898703 [	shc:193102][ AAoAAVCjZa9H9AAA_]L-SHC-13208: Received 8168 bytes from shcfmt ID [AAoAAVCjZa9H9AAA]/m0100/t488552/p103000 at 1705986036	93600
+24.01.22 21:00:36.359934703 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-13213: Got request from (184)
+24.01.22 21:00:36.359953902 [	shc:193102][ AAoAAVCjZa9H9AAA_]I-SHC-13216: THROTTLE: Continue processing.
+24.01.22 21:00:36.363787858 [	shc:193102][_AAoAAvCjZa9H9AAA_]W-SEG2-007004: Unsupported segment/ELF ID [] ignored.
+24.01.22 21:00:36.363803458 [	shc:193102][_AAoAAvCjZa9H9AAA_]E-SEG2-010015: can't map <> to id, skip..
+24.01.22 21:00:36.363861657 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-027021: Can't find shckeys record (,)
+24.01.22 21:00:36.363908057 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-14511: Setup originator field in shcmsg
+24.01.22 21:00:36.363923657 [	shc:193102][ AAoAAVCjZa9H9AAA_]E-BUSDAY-102.1:business day profile is empty
+24.01.22 21:00:36.363933056 [	shc:193102][_AAoAAVCjZa9H9AAA_]I-SHC-14512: Process Bus Date [4] [-1]
+24.01.22 21:00:36.363940456 [	shc:193102][_AAoAAvCjZa9H9AAA_]E-BUSDAY-100.1:business day profile is empty
+24.01.22 21:00:36.363957456 [	shc:193102][_AAoAAvCjZa9H9AAA_]W-BUSDAY-116: InstID [FISACQ] business day not found, use local date [20240122] 
+24.01.22 21:00:36.363964456 [	shc:193102][_AAoAAvCjZa9H9AAA_]E-BUSDAY-100.1:business day profile is empty
+24.01.22 21:00:36.363973456 [	shc:193102][_AAoAAVCjZa9H9AAA_]W-BUSDAY-116: InstID [CHASEPT] business day not found, use local date [20240122]
+24.01.22 21:00:36.363981056 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-14514: Perform currency conversion
+24.01.22 21:00:36.363996056 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-074002: (header) enrich (iss=		72, acq=	000001), (txnSrc-FISACQ, txnDest=CHASEPT)
+24.01.22 21:00:36.364008656 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-074006: ShcFinAuthReq::edit()
+24.01.22 21:00:36.364051355 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-074011: edit (): Normal exit. 
+24.01.22 21:00:36.364064455 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-074030: ShcFinAuthReq:: verify() 0x00000000 0x00000000  
+24.01.22 21:00:36.364084555 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-14536: No pin translation: txn has no pin. 
+24.01.22 21:00:36.364097355 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-030002: Update Stats for 100 msg and Resp (-1) 
+24.01.22 21:00:36.364120854 [	shc:193102][_AAoAAvCjZa9H9AAA_]W-SEG-017001: buffer len (-1) less than data len (0), ID[483] 
+24.01.22 21:00:36.368078408 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-5072: insert cost [4] 
+24.01.22 21:00:36.373637544 [	shc:193102][_AAoAAvCjZa9H9AAA ]I-SHC-9814: commit cost [6]
+24.01.22 21:00:36.373730443 [	shc:193102][_AAoAAVCjZa9H9AAA_]I-SHC-031028: action: Send to issuer 
+24.01.22 21:00:36.373767143 [	shc:193102][_AAoAAVCjZa9H9AAA_IL-SHC-031040: Sent mag ID [AAoAAvCj2a9H9AAA] /m0100/t488552/p103000 to ChasePnsFormatter 
+24.01.22 21:00:36.373781542 [	shc:193102][_AAoAAVCjZa9H9AAA_]I-SHC-030010: Route: m0100/a 000001/i 72/t488552/p103000/r00/c6011********7372	-->(119)
+24.01.22 21:00:36.377647598 [	shc:193102][_AAoAAvCjZa9H9AAA_]I-SHC-9829: Messages out at 1705986036 378 
+24.01.22 21:00:36.683239563 [	shc:193107][_AAoAAvCjZa9H9AAB_]L-SHC-13208: Received 8512 bytes from shofmt ID [AAoAAvCjZa9H9AAB]/m0200/t016721/p003000 at 1705986036 683
+24.01.22 21:00:36.683284462 [	shc:193107][_AAoAAvCjZa9H9AAB_]I-SHC-13213: Got request from (184) 
+24.01.22 21:00:36.683306562 [	shc:193107][_AAoAAvCjZa9H9AAB_]I-SHC-13216: THROTTLE: Continue processing. 
+24.01.22 21:00:36.687340015 [	shc:193107][_AAoAAvCjZa9H9AAB_]W-SEG2-007004: Unsupported segment/ELF ID [] ignored. 
+24.01.22 21:00:36.687354915 [	shc:193107][_AAoAAvCjZa9H9AAB_]E-SEG2-010015: can't map <> to id, skip. 
+24.01.22 21:00:36.687394115 [	shc:193107][_AAoAAvCjZa9H9AAB_]I-SHC-027021: Can't find shckeys record (,) 
+24.01.22 21:00:36.687435514 [	shc:193107][_AAoAAvCjZa9H9AAB_]I-SHC-14511: Setup originator field in shcmsg 
+24.01.22 21:00:36.687450814 [	shc:193107][_AAoAAVCjZa9H9AAB_]E-BUSDAY-102.1:business day profile is empty 
+24.01.22 21:00:36.687459714 [	shc:193107][_AAoAAVCjZa9H9AAB_]I-SHC-14512: Process Bus Date [4] [-1] 
+24.01.22 21:00:36.687467014 [	shc:193107][_AAoAAVCjZa9H9AAB_]E-BUSDAY-100.1: business day profile is empty 
+24.01.22 21:00:36.687476114 [	shc:193107][_AAoAAVCjZa9H9AAB_]W-BUSDAY-116: InstID [FISACQ] business day not found, use local date [20240122]
+24.01.22 21:00:36.687485413 [	shc:193107][_AAoAAvCjZa9H9AAB_]E-BUSDAY-100.1:business day profile is empty 
+24.01.22 21:00:36.687491513 [	shc:193107][_AAoAAvCjZa9H9AAB_]W-BUSDAY-116: InstID [CHASEPT] business day not found, use local date [20240122]
+24.01.22 21:00:36.687501913 [	shc:193107][_AAoAAvCjZa9H9AAB_]I-SHC-14514: Perform currency conversion
+24.01.22 21:00:37.001681579 [	shc:193098][_AAoAAvCjZa9H9AAE_]I-SHC-9814: commit cost [12] 
+24.01.22 21:00:37.001782478 [	shc:193098][_AAoAAvCjZa9H9AAE_]I-SHC-031028: action: Send to issuer 
+24.01.22 21:00:37.001829477 [	shc:193098][_AAoAAvCjZa9H9AAE_]L-SHC-031040: Sent msg ID [AAoAAvCjZa9H9AAE] /m0200/t452085/p003000 to Chase Pns Formatter
+24.01.22 21:00:37.001844377 [	shc:193098][ AAoAAvCjZa9H9AAE_]I-SHC-030010: Route: m0200/a 000001/i 72/t452085/p003000/r00/c4030********1151 -->(119) 
+24.01.22 21:00:37.005629333 [	shc:193098][_AAoAAvCjZa9H9AAE_]I-SHC-9829: Messages out at 1705986037 6 
+24.01.22 21:00:37.123931165 [	shc:193109][_AAoAAvCjZa9H9AAC_]L-SHC-13208: Received 9456 bytes from ChasePnsFormatter ID [AAoAAvCjZa9H9AAC]/m0130/t465400/p113000 at 1705986037 124
+24.01.22 21:00:37.123975064 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-13213: Got request from (119)
+24.01.22 21:00:37.123994864 [	shc:193109][ AAoAAvCjZa9H9AAC_]I-SHC-13216: THROTTLE: Continue processing
+24.01.22 21:00:37.127995018 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-027021: Can't find shckeys record (,)
+24.01.22 21:00:37.128045917 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-14511: Setup originator field in shcmsg 
+24.01.22 21:00:37.128064617 [	shc:193109][_AAoAAvCjZa 9H9AAC_1D-SHC-073075 Response code is [00] 
+24.01.22 21:00:37.128075717 [	shc:193109][_AAoAAvCjZa9H9AAC_]D-SHC-073075a stand_in_decision_re_list: [] 
+24.01.22 21:00:37.128083817 [	shc:193109][_AAoAAvCj2a9H9AAC_]D-SHC-073075b stand_in_decision_timeout: [300] 
+24.01.22 21:00:37.128115716 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-14514: Perform currency conversion 
+24.01.22 21:00:37.128130716 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-075001: (header) enrich (iss= 72, acq 000001), (tXnSrc=FISACQ, txnDest=CHASEPT)
+24.01.22 21:00:37.128149816 [ 	shc:193109][_AAoAAVCjZa9H9AAC_]L-SHC-073044: Replace ID [AAoAAVCjZa9H9AAC] with ID [AAoAAvCj Za9H9AAC] 
+24.01.22 21:00:37.133680652 [ 	shc:193109][ AAoAAvCjZa9H9AAC_]1-SHC-030002: Update Stats for 130 msg and Resp (0) 
+24.01.22 21:00:37.133804950 [	shc:193109][_AAoAAvCjZa9H9AAC_]W-SEG-017001: buffer len (-1) less than data len (0), ID [483] 
+24.01.22 21:00:37.133896049 [	shc:193109][_AAoAAvCjZa9H9AAC_]W-SEG-017002: in IstSegTLV:: flattenSegMemcpy, size of buf[-432] not passed 
+24.01.22 21:00:37.133943849 [	shc:193109][_AAoAAVCjZa9H9AAC_]W-SEG-017002: in IstSegTLV:: flatten SegMemcpy, size of buf[-626] not passed 
+24.01.22 21:00:37.133971448 [	shc:193109][_AAoAAvCjZa9H9AAC_]W-SEG-017002: in IstSegTLV:: flattenSegMemcpy, size of buf[-633] not passed 
+24.01.22 21:00:37.134001948 [	shc:193109][_AAoAAvCjZa9H9AAC_]W-SEG-017002: in Ist SegTLV:: flattenSegMemcpy, size of buf[-712] not passed 
+24.01.22 21:00:37.134033948 [ 	shc:193109][_AAoAAVCjZa9H9AAC_]W-SEG-017002: in IstSegTLV:: flattenSegMemcpy, size of buf[-882] not passed 
+24.01.22 21:00:37.135718228 [ 	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-5072: insert cost [2] 
+24.01.22 21:00:37.139347586 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-9814: commit cost [3]
+24.01.22 21:00:37.139409886 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-031029: action Return to sender 
+24.01.22 21:00:37.139534284 [	shc:193109][_AAoAAvCjZa9H9AAC_]L-SHC-031040: Sent msg ID [AAoAAVCjZa9H9AAC] /m0130/t465400/p113000 to shcfmt 
+24.01.22 21:00:37.139683182 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-030010: Route: m0130/a 000001/i 72/t465400/p113000/r00/c4046********1306 -->(184)
+24.01.22 21:00:37.145053520 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:37.145070220 [	shc:193109][_AAoAAVCjZa9H9AAC_]I-SHC-016006: server mailbox not found, msg not sent
+24.01.22 21:00:37.145125919 [	shc:193109][_AAoAAvCjZa9H9AAC_]I-SHC-9829: Messages out at 1705986037 145
+24.01.22 21:00:37.223243816 [	shc:193110][_AAoAAvCjZa9H9QAA_]L-SHC-13208: Received 8448 bytes from shcfmt ID [AAoAAvCjZa9H9QAA]/m0200/t109849/p0030
+24.01.22 21:00:37.223284115 [	shc:193110][_AAoAAVCjZa9H9QAA_]I-SHC-13213: Got request from (184)
+24.01.22 21:00:37.223305315 [	shc:193110][_AAoAAVCjZa9H9QAA_]I-SHC-13216: THROTTLE: Continue processing. 
