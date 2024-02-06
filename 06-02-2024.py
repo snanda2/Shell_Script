@@ -12,7 +12,16 @@ def clean_line(line):
     """Remove or replace invalid control characters from the line."""
     # Remove characters outside the ASCII printable range
     cleaned_line = ''.join(char if 32 <= ord(char) < 127 else ' ' for char in line)
+
+    # Remove problematic double quotes within double quotes
+    cleaned_line = re.sub(r'"(.*?)"', lambda x: x.group().replace('"', ''), cleaned_line)
+
+    # Ensure the line has balanced braces
+    while cleaned_line.count('{') > cleaned_line.count('}'):
+        cleaned_line = cleaned_line.rsplit('{', 1)[0]
+
     return cleaned_line
+
 
 def clean_and_extract_response_fields(line):
     try:
@@ -32,7 +41,8 @@ def clean_and_extract_response_fields(line):
 
         return response_code, response_message, host_response_code, actual_response_code
     except json.JSONDecodeError as json_error:
-        print(f"JSON Decode Error: {json_error}")
+        print(f"Error decoding JSON: {json_error}")
+        print(f"Problematic JSON string: {cleaned_line}")
         return None
     except Exception as e:
         print(f"Error extracting response fields: {e}")
