@@ -1,19 +1,27 @@
 import re
 from collections import deque
-import time
 import os
 import json
 
 def tail(filename, n=10):
     """Read the last n lines from the given file."""
-    with open(filename, 'r') as file:
+    with open(filename, 'r', errors='replace') as file:
         return deque(file, n)
 
-def extract_response_fields(line):
+def clean_line(line):
+    """Remove or replace invalid control characters from the line."""
+    # Remove characters outside the ASCII printable range
+    cleaned_line = ''.join(char if 32 <= ord(char) < 127 else ' ' for char in line)
+    return cleaned_line
+
+def clean_and_extract_response_fields(line):
     try:
-        # Extracting the JSON part of the log line
-        json_start = line.find('{"')
-        json_str = line[json_start:]
+        # Clean the line before attempting to extract response fields
+        cleaned_line = clean_line(line)
+
+        # Extracting the JSON part of the line
+        json_start = cleaned_line.find('{"')
+        json_str = cleaned_line[json_start:]
         json_data = json.loads(json_str)
 
         # Extracting relevant fields from the JSON data
@@ -23,17 +31,12 @@ def extract_response_fields(line):
         actual_response_code = json_data.get('additionalResponseData', {}).get('actualResponseCode', 'Not Present')
 
         return response_code, response_message, host_response_code, actual_response_code
+    except json.JSONDecodeError as json_error:
+        print(f"JSON Decode Error: {json_error}")
+        return None
     except Exception as e:
         print(f"Error extracting response fields: {e}")
         return None
-
-def find_matching_log_files(log_directory, target_date):
-    """Find log files in the directory with the target date in the filename."""
-    matching_files = []
-    for filename in os.listdir(log_directory):
-        if filename.startswith(f'wso2carbon-{target_date}') and filename.endswith('.txt'):
-            matching_files.append(os.path.join(log_directory, filename))
-    return matching_files
 
 # Use the Downloads folder as the log_directory
 downloads_directory = os.path.join(os.path.expanduser('~'), 'Downloads')
@@ -42,7 +45,7 @@ downloads_directory = os.path.join(os.path.expanduser('~'), 'Downloads')
 target_date = input("Enter the date (YYYY-MM-DD): ")
 
 # Find matching log files
-matching_files = find_matching_log_files(downloads_directory, target_date)
+matching_files = [os.path.join(downloads_directory, f) for f in os.listdir(downloads_directory) if f.startswith(f'wso2carbon-{target_date}') and f.endswith('.txt')]
 
 # Print found log files
 print("\nFound Log Files:")
@@ -82,8 +85,7 @@ while True:
         lines = tail(log_file, n=num_lines)
 
         for line in lines:
-            if 'OUT_MESSAGE' in line:
-                response_fields = extract_response_fields(line)
-                if response_fields:
-                    response_code, response_message, host_response_code, actual_response_code = response_fields
-                    print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
+            response_fields = clean_and_extract_response_fields(line)
+            if response_fields:
+                response_code, response_message, host_response_code, actual_response_code = response_fields
+                print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
