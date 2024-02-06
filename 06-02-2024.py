@@ -2,6 +2,7 @@ import re
 from collections import deque
 import time
 import os
+import json
 
 def tail(filename, n=10):
     """Read the last n lines from the given file."""
@@ -10,32 +11,37 @@ def tail(filename, n=10):
 
 def extract_response_fields(log_line):
     """Extract response fields from OUT_MESSAGE log line."""
-    pattern = re.compile(r'"responseCode":(\d+),"responseMessage":"([^"]*)","hostResponseCode":"([^"]*)","actualResponseCode":"([^"]*)"')
-    match = re.search(pattern, log_line)
-    if match:
-        response_code = match.group(1)
-        response_message = match.group(2) if match.group(2) else "Not Present"
-        host_response_code = match.group(3) if match.group(3) else "Not Present"
-        actual_response_code = match.group(4) if match.group(4) else "Not Present"
+    try:
+        log_data = json.loads(log_line.split('---Response --- =')[1])
+        response_code = str(log_data.get('responseCode', 'Not Present'))
+        response_message = log_data.get('responseMessage', 'Not Present')
+        host_response_code = log_data.get('hostResponseCode', 'Not Present')
+        actual_response_code = log_data.get('additionalResponseData', {}).get('actualResponseCode', 'Not Present')
         return response_code, response_message, host_response_code, actual_response_code
-    else:
+    except (ValueError, KeyError, IndexError):
         return "Not Present", "Not Present", "Not Present", "Not Present"
 
 def find_matching_log_files(log_directory, target_date):
     """Find log files in the directory with the target date in the filename."""
     matching_files = []
     for filename in os.listdir(log_directory):
-        if filename.startswith(f'wso2carbon-{target_date}') and filename.endswith('.log'):
+        if filename.startswith(f'wso2carbon-{target_date}') and filename.endswith('.txt'):
             matching_files.append(os.path.join(log_directory, filename))
     return matching_files
 
-log_directory = '/path/to/log/files/'  # Replace with the actual path
+# Use the Downloads folder as the log_directory
+downloads_directory = os.path.join(os.path.expanduser('~'), 'Downloads')
 
 # Ask the user for the date
 target_date = input("Enter the date (YYYY-MM-DD): ")
 
 # Find matching log files
-matching_files = find_matching_log_files(log_directory, target_date)
+matching_files = find_matching_log_files(downloads_directory, target_date)
+
+# Print found log files
+print("\nFound Log Files:")
+for log_file in matching_files:
+    print(log_file)
 
 while True:
     # Ask the user for options
@@ -76,5 +82,3 @@ while True:
                 response_code, response_message, host_response_code, actual_response_code = extract_response_fields(line)
                 print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
 
-    # Allow time for the user to view the output
-    time.sleep(2)  # Adjust the sleep duration as needed
