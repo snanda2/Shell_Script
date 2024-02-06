@@ -9,17 +9,23 @@ def tail(filename, n=10):
     with open(filename, 'r') as file:
         return deque(file, n)
 
-def extract_response_fields(log_line):
-    """Extract response fields from OUT_MESSAGE log line."""
+def extract_response_fields(line):
     try:
-        log_data = json.loads(log_line.split('---Response --- =')[1])
-        response_code = str(log_data.get('responseCode', 'Not Present'))
-        response_message = log_data.get('responseMessage', 'Not Present')
-        host_response_code = log_data.get('hostResponseCode', 'Not Present')
-        actual_response_code = log_data.get('additionalResponseData', {}).get('actualResponseCode', 'Not Present')
+        # Extracting the JSON part of the log line
+        json_start = line.find('{"')
+        json_str = line[json_start:]
+        json_data = json.loads(json_str)
+
+        # Extracting relevant fields from the JSON data
+        response_code = json_data.get('responseCode', 'Not Present')
+        response_message = json_data.get('responseMessage', 'Not Present')
+        host_response_code = json_data.get('hostResponseCode', 'Not Present')
+        actual_response_code = json_data.get('additionalResponseData', {}).get('actualResponseCode', 'Not Present')
+
         return response_code, response_message, host_response_code, actual_response_code
-    except (ValueError, KeyError, IndexError):
-        return "Not Present", "Not Present", "Not Present", "Not Present"
+    except Exception as e:
+        print(f"Error extracting response fields: {e}")
+        return None
 
 def find_matching_log_files(log_directory, target_date):
     """Find log files in the directory with the target date in the filename."""
@@ -73,12 +79,11 @@ while True:
     # Process each matching log file
     for log_file in matching_files:
         print(f"\nLog file: {log_file}")
-        # Read the last 'num_lines' lines
         lines = tail(log_file, n=num_lines)
 
-        # Process the filtered lines
         for line in lines:
             if 'OUT_MESSAGE' in line:
-                response_code, response_message, host_response_code, actual_response_code = extract_response_fields(line)
-                print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
-
+                response_fields = extract_response_fields(line)
+                if response_fields:
+                    response_code, response_message, host_response_code, actual_response_code = response_fields
+                    print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
