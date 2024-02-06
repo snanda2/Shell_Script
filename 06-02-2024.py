@@ -25,10 +25,8 @@ def find_matching_log_files(log_directory, target_date):
     """Find log files in the directory with the target date in the filename."""
     matching_files = []
     for filename in os.listdir(log_directory):
-        if filename.startswith('wso2carbon-') and filename.endswith('.log'):
-            file_date = filename.split('-')[1]
-            if file_date == target_date:
-                matching_files.append(os.path.join(log_directory, filename))
+        if filename.startswith(f'wso2carbon-{target_date}') and filename.endswith('.log'):
+            matching_files.append(os.path.join(log_directory, filename))
     return matching_files
 
 log_directory = '/path/to/log/files/'  # Replace with the actual path
@@ -44,9 +42,10 @@ while True:
     print("\nOptions:")
     print("1. Print last 10 lines continuously (default)")
     print("2. Manually enter the number of lines to print")
+    print("3. Display all lines")
     print("0. Exit")
 
-    choice = input("Enter your choice (0-2): ")
+    choice = input("Enter your choice (0-3): ")
 
     if choice == "0":
         break
@@ -59,8 +58,10 @@ while True:
         except ValueError:
             print("Invalid input. Please enter a valid number.")
             continue
+    elif choice == "3":
+        num_lines = None  # Display all lines
     else:
-        print("Invalid choice. Please enter 0, 1, or 2.")
+        print("Invalid choice. Please enter 0, 1, 2, or 3.")
         continue
 
     # Process each matching log file
@@ -75,5 +76,5 @@ while True:
                 response_code, response_message, host_response_code, actual_response_code = extract_response_fields(line)
                 print(f"{response_code}\t{response_message}\t{host_response_code}\t{actual_response_code}")
 
-    # Sleep for a short duration before checking again
+    # Allow time for the user to view the output
     time.sleep(2)  # Adjust the sleep duration as needed
