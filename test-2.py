@@ -43,11 +43,12 @@ def print_response_fields(response_parts):
             print(f"Error decoding JSON: {response_part}, {e}")
 
 def process_log_file(file_path):
+    in_message_count = 0  # Initialize to 0
     try:
         with open(file_path, 'r', errors='replace') as file:
             inside_response_section = False
             response_parts = []
-            in_message_count = 0
+
             for line in file:
                 if 'IN_MESSAGE' in line:
                     in_message_count += 1
@@ -57,8 +58,10 @@ def process_log_file(file_path):
                         response_parts.append(response_part)
     except FileNotFoundError:
         print(f"Error: File not found at path {file_path}")
+        return  # Return or handle appropriately
     except Exception as e:
         print(f"Error reading the file: {e}")
+        return  # Return or handle appropriately
 
     # Print totals
     print(f"\nTotal No. of IN_MESSAGE: {in_message_count}")
@@ -76,7 +79,6 @@ def print_after_response(line):
         response_part_cleaned = ''.join(char for char in response_part if char.isprintable())
 
         return response_part_cleaned
-
 
 # Directory path and date input
 directory_path = os.path.join(os.path.expanduser('~'), 'Downloads')
