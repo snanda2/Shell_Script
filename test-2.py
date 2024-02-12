@@ -42,26 +42,30 @@ def print_response_fields(response_parts):
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {response_part}, {e}")
 
-def process_log_file(file_path):
+def process_log_files(directory_path, date):
     in_message_count = 0  # Initialize to 0
-    try:
-        with open(file_path, 'r', errors='replace') as file:
-            inside_response_section = False
-            response_parts = []
+    response_parts = []
 
-            for line in file:
-                if 'IN_MESSAGE' in line:
-                    in_message_count += 1
-                elif 'OUT_MESSAGE' in line and '--- Response ---' in line:
-                    response_part = print_after_response(line)
-                    if response_part:
-                        response_parts.append(response_part)
-    except FileNotFoundError:
-        print(f"Error: File not found at path {file_path}")
-        return  # Return or handle appropriately
-    except Exception as e:
-        print(f"Error reading the file: {e}")
-        return  # Return or handle appropriately
+    # Iterate over all files in the directory
+    for filename in os.listdir(directory_path):
+        if filename.startswith(f'wso2carbon-{date}') and filename.endswith('.txt'):
+            file_path = os.path.join(directory_path, filename)
+
+            try:
+                with open(file_path, 'r', errors='replace') as file:
+                    inside_response_section = False
+
+                    for line in file:
+                        if 'IN_MESSAGE' in line:
+                            in_message_count += 1
+                        elif 'OUT_MESSAGE' in line and '--- Response ---' in line:
+                            response_part = print_after_response(line)
+                            if response_part:
+                                response_parts.append(response_part)
+            except FileNotFoundError:
+                print(f"Error: File not found at path {file_path}")
+            except Exception as e:
+                print(f"Error reading the file: {e}")
 
     # Print totals
     print(f"\nTotal No. of IN_MESSAGE: {in_message_count}")
@@ -85,4 +89,4 @@ directory_path = os.path.join(os.path.expanduser('~'), 'Downloads')
 date = input("Enter the date (in the format YYYY-MM-DD): ")
 
 # Process the log files
-process_log_file(os.path.join(directory_path, f'wso2carbon-{date}-1.txt'))
+process_log_files(directory_path, date)
