@@ -152,6 +152,7 @@ html_content = """
             border: 1px solid black;
             padding: 10px;
             font-family: Arial, sans-serif;
+            display: none;
         }
     </style>
 </head>
@@ -186,7 +187,7 @@ for project_key in project_keys:
 
         # Add project key header
         html_content += f"""
-        <h1 class="main-header">Jira Open Issues for {project_key}</h1>
+        <h1 class="main-header">{project_key}</h1>
         <table>
             <tr>
                 <th class="left-align">SL.No</th>
@@ -201,10 +202,10 @@ for project_key in project_keys:
 
         # Add rows to HTML content with clickable links
         for index, issue in enumerate(open_issues, start=1):
-            jira_number = issue['key'][:jira_number_width]
-            status = issue['fields']['status']['name'][:status_width]
-            assignee = (issue['fields']['assignee']['displayName'] if 'assignee' in issue['fields'] and issue['fields']['assignee'] else 'Unassigned')[:assignee_width]
-            summary = issue['fields']['summary'][:summary_width]
+            jira_number = issue['key'][:15]
+                        status = issue['fields']['status']['name'][:20]
+            assignee = (issue['fields']['assignee']['displayName'] if 'assignee' in issue['fields'] and issue['fields']['assignee'] else 'Unassigned')[:20]
+            summary = issue['fields']['summary'][:50]
             created_date = datetime.strptime(issue['fields']['created'], "%Y-%m-%dT%H:%M:%S.%f%z").strftime("%Y-%m-%d")
             
             # Calculate age of the ticket
@@ -241,7 +242,7 @@ for project_key in project_keys:
         """
 
         # Add project key to the side key content
-        side_key_content += f"<li>{project_key}</li>"
+        side_key_content += f"<li><a href='javascript:void(0)' onclick='showProject(\"{project_key}\")'>{project_key}</a></li>"
 
 # Close the side key content
 side_key_content += "</ul></div>"
