@@ -4,7 +4,6 @@ from requests.auth import HTTPBasicAuth
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import subprocess
 from datetime import datetime, timezone
 
 def get_open_issues(jira_url, username, password, project_key):
@@ -125,11 +124,13 @@ if open_issues:
                 text-align: center;
                 background-color: #33FFBE;
                 font-weight: bold;
+                font-family: Arial, sans-serif;
             }}
             td {{
                 border: 1px solid black;
                 padding: 8px;
                 text-align: left;
+                font-family: Arial, sans-serif;
             }}
             a {{
                 text-decoration: none;
@@ -143,6 +144,7 @@ if open_issues:
                 background-color: #A533FF;
                 color: white;
                 text-align: center;
+                font-family: Arial, sans-serif;
             }}
             .green {{
                 background-color: limegreen;
@@ -161,6 +163,10 @@ if open_issues:
                 padding: 10px;
                 font-size: 24px;
                 font-weight: bold;
+                font-family: Arial, sans-serif;
+            }}
+            .left-align {{
+                text-align: left;
             }}
         </style>
     </head>
@@ -168,13 +174,13 @@ if open_issues:
         <h1 class="main-header">Jira Open Issues for {project_key}</h1>
         <table>
             <tr>
-                <th>SL.No</th>
-                <th>Jira Number</th>
-                <th>Status</th>
-                <th>Assignee</th>
-                <th>Summary</th>
-                <th>Created Date</th>
-                <th>Age of Ticket</th>
+                <th class="left-align">SL.No</th>
+                <th class="left-align">Jira Number</th>
+                <th class="left-align">Status</th>
+                <th class="left-align">Assignee</th>
+                <th class="left-align">Summary</th>
+                <th class="left-align">Created Date</th>
+                <th class="left-align">Age of Ticket</th>
             </tr>
     """
 
@@ -223,8 +229,8 @@ if open_issues:
                 <th colspan="2" class="summary-header">Issue Summary</th>
             </tr>
             <tr>
-                <th>Category</th>
-                <th>Total</th>
+                <th class="left-align">Category</th>
+                <th class="left-align">Total</th>
             </tr>
             <tr>
                 <td>Open</td>
@@ -248,8 +254,8 @@ if open_issues:
                 <th colspan="2" class="summary-header">Assignee Summary</th>
             </tr>
             <tr>
-                <th>Assignee</th>
-                <th>Total</th>
+                <th class="left-align">Assignee</th>
+                <th class="left-align">Total</th>
             </tr>
     """
 
@@ -262,11 +268,12 @@ if open_issues:
         """
         html_content += row_html
 
+    # Add the unassigned row
     row_html = f"""
-            <tr>
-                <td>Unassigned</td>
-                <td>{unassigned_count}</td>
-            </tr>
+        <tr>
+            <td>Unassigned</td>
+            <td>{unassigned_count}</td>
+        </tr>
     """
     html_content += row_html
 
