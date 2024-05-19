@@ -61,20 +61,19 @@ if os.path.exists(html_filename):
 
 open_issues = get_open_issues(jira_url, username, password, project_key)
 
-open_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'Open')
-in_progress_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'In Progress')
-reopened_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'Reopened')
-
 if open_issues:
+    open_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'Open')
+    in_progress_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'In Progress')
+    reopened_count = sum(1 for issue in open_issues if issue['fields']['status']['name'] == 'Reopened')
+
     html_content = f"""
     <html>
     <head>
         <style>
             table {{
                 border-collapse: collapse;
-                width: 48%;
-                margin-right: 2%;
-                float: left;
+                width: 100%;
+                margin-bottom: 20px;
             }}
             th, td {{
                 border: 1px solid black;
@@ -107,70 +106,8 @@ if open_issues:
         </style>
     </head>
     <body>
+        <h1>Jira Open Issues for {project_key}</h1>
         <table>
-            <tr>
-                <th colspan="2" class="summary-header">Issue Summary</th>
-            </tr>
-            <tr>
-                <th>Category</th>
-                <th>Total</th>
-            </tr>
-            <tr>
-                <td>Open</td>
-                <td>{open_count}</td>
-            </tr>
-            <tr>
-                <td>In Progress</td>
-                <td>{in_progress_count}</td>
-            </tr>
-            <tr>
-                <td>Reopened</td>
-                <td>{reopened_count}</td>
-            </tr>
-        </table>
-        <table>
-            <tr>
-                <th colspan="2" class="summary-header">Assignee Summary</th>
-            </tr>
-            <tr>
-                <th>Assignee</th>
-                <th>Total</th>
-            </tr>
-    """
-
-    assignee_counts = {}
-    unassigned_count = 0
-    for issue in open_issues:
-        assignee = issue['fields']['assignee']
-        if assignee:
-            assignee_name = assignee['displayName']
-            assignee_counts[assignee_name] = assignee_counts.get(assignee_name, 0) + 1
-        else:
-            unassigned_count += 1
-
-    for assignee, count in assignee_counts.items():
-        row_html = f"""
-            <tr>
-                <td>{assignee}</td>
-                <td>{count}</td>
-            </tr>
-        """
-        html_content += row_html
-
-    row_html = f"""
-            <tr>
-                <td>Unassigned</td>
-                <td>{unassigned_count}</td>
-            </tr>
-    """
-    html_content += row_html
-
-    html_content += """
-        </table>
-        <table style="clear: both; width: 100%;">
-            <tr>
-                <th colspan="7" class="summary-header">Open Issues</th>
-            </tr>
             <tr>
                 <th>SL.No</th>
                 <th>Jira Number</th>
@@ -212,6 +149,69 @@ if open_issues:
             </tr>
         """
         html_content += row_html
+
+    html_content += """
+        </table>
+        <table>
+            <tr>
+                <th colspan="2" class="summary-header">Issue Summary</th>
+            </tr>
+            <tr>
+                <th>Category</th>
+                <th>Total</th>
+            </tr>
+            <tr>
+                <td>Open</td>
+                <td>{open_count}</td>
+            </tr>
+            <tr>
+                <td>In Progress</td>
+                <td>{in_progress_count}</td>
+            </tr>
+            <tr>
+                <td>Reopened</td>
+                <td>{reopened_count}</td>
+            </tr>
+        </table>
+        <table>
+            <tr>
+                <th colspan="2" class="summary-header">Assignee Summary</th>
+            </tr>
+            <tr>
+                <th>Assignee</th>
+                <th>Total</th>
+            </tr>
+    """
+
+    assignee_counts = {}
+    unassigned_count = 0
+    for issue in open_issues:
+        assignee = issue['fields']['assignee']
+        if assignee:
+            assignee_name = assignee['displayName']
+            assignee_counts[assignee_name] = assignee_counts.get(assignee_name, 0) + 1
+        else:
+            unassigned_count += 1
+
+    # Sort assignees by count, descending
+    sorted_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)
+
+    for assignee, count in sorted_assignees:
+        row_html = f"""
+            <tr>
+                <td>{assignee}</td>
+                <td>{count}</td>
+            </tr>
+        """
+        html_content += row_html
+
+    row_html = f"""
+            <tr>
+                <td>Unassigned</td>
+                <td>{unassigned_count}</td>
+            </tr>
+    """
+    html_content += row_html
 
     html_content += """
         </table>
