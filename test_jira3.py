@@ -81,7 +81,7 @@ if open_issues:
                 text-align: left;
             }}
             th {{
-                background-color: #f2f2f2;
+                background-color: #33FFBE;
             }}
             a {{
                 text-decoration: none;
@@ -93,6 +93,8 @@ if open_issues:
                 font-weight: bold;
                 border-top: 2px solid black;
                 border-bottom: 1px solid black;
+                background-color: #A533FF;
+                color: white;
             }}
             .green {{
                 background-color: limegreen;
@@ -106,7 +108,7 @@ if open_issues:
         </style>
     </head>
     <body>
-        <h1>Jira Open Issues for {project_key}</h1>
+        <h1 style="border: 2px solid #A533FF; background-color: #A533FF; color: white; text-align: center;">Jira Open Issues for {project_key}</h1>
         <table>
             <tr>
                 <th>SL.No</th>
@@ -150,7 +152,7 @@ if open_issues:
         """
         html_content += row_html
 
-    html_content += """
+    html_content += f"""
         </table>
         <table>
             <tr>
