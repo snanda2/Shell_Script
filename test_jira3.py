@@ -78,10 +78,12 @@ if open_issues:
             th, td {{
                 border: 1px solid black;
                 padding: 8px;
-                text-align: left;
+                text-align: center;
             }}
             th {{
                 background-color: #33FFBE;
+                font-weight: bold;
+                border: 1px solid #000;
             }}
             a {{
                 text-decoration: none;
@@ -89,12 +91,12 @@ if open_issues:
                 cursor: pointer;
             }}
             .summary-header {{
-                text-align: left;
                 font-weight: bold;
                 border-top: 2px solid black;
                 border-bottom: 1px solid black;
                 background-color: #A533FF;
                 color: white;
+                text-align: center;
             }}
             .green {{
                 background-color: limegreen;
@@ -105,10 +107,19 @@ if open_issues:
             .red {{
                 background-color: red;
             }}
+            .main-header {{
+                border: 2px solid #A533FF;
+                background-color: #A533FF;
+                color: white;
+                text-align: center;
+                padding: 10px;
+                font-size: 24px;
+                font-weight: bold;
+            }}
         </style>
     </head>
     <body>
-        <h1 style="border: 2px solid #A533FF; background-color: #A533FF; color: white; text-align: center;">Jira Open Issues for {project_key}</h1>
+        <h1 class="main-header">Jira Open Issues for {project_key}</h1>
         <table>
             <tr>
                 <th>SL.No</th>
@@ -195,7 +206,6 @@ if open_issues:
         else:
             unassigned_count += 1
 
-    # Sort assignees by count, descending
     sorted_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)
 
     for assignee, count in sorted_assignees:
