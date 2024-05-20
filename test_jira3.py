@@ -91,6 +91,37 @@ html_content = """
 <html>
 <head>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+        .sidenav {
+            height: 100%;
+            width: 200px;
+            position: fixed;
+            z-index: 1;
+            top: 0;
+            left: 0;
+            background-color: #111;
+            padding-top: 20px;
+        }
+        .sidenav a {
+            padding: 8px 8px 8px 16px;
+            text-decoration: none;
+            font-size: 18px;
+            color: #818181;
+            display: block;
+        }
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+        .content {
+            margin-left: 220px;
+            padding: 20px;
+            width: calc(100% - 220px);
+        }
         table {
             border-collapse: collapse;
             width: 100%;
@@ -146,21 +177,35 @@ html_content = """
         .left-align {
             text-align: left;
         }
-        .side-key {
-            float: right;
-            margin-top: 20px;
-            border: 1px solid black;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-            display: none;
+        .right-align {
+            text-align: right;
+        }
+        .center-align {
+            text-align: center;
         }
     </style>
+    <script>
+        function showProject(projectKey) {
+            var elements = document.getElementsByClassName('project-content');
+            for (var i = 0; i < elements.length; i++) {
+                elements[i].style.display = 'none';
+            }
+            document.getElementById(projectKey).style.display = 'block';
+        }
+    </script>
 </head>
 <body>
+<div class="sidenav">
 """
 
-# Initialize side key content
-side_key_content = "<div class='side-key'><h2>Project Keys</h2><ul>"
+# Add project keys to side navigation
+for project_key in project_keys:
+    html_content += f'<a href="javascript:void(0)" onclick="showProject(\'{project_key}\')">{project_key}</a>'
+
+html_content += """
+</div>
+<div class="content">
+"""
 
 # Loop over each project key
 for project_key in project_keys:
@@ -185,12 +230,52 @@ for project_key in project_keys:
 
         sorted_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)
 
-        # Add project key header
+        # Add project key content
         html_content += f"""
-        <h1 class="main-header">{project_key}</h1>
+        <div id="{project_key}" class="project-content" style="display: none;">
+        <h1 class="main-header">Jira Open Issues for {project_key}</h1>
+        <table>
+            <tr class="summary-header"><td colspan="2">Issue Summary</td></tr>
+            <tr>
+                <td class="left-align">Open</td>
+                <td class="left-align">{open_count}</td>
+            </tr>
+            <tr>
+                <td class="left-align">In Progress</td>
+                <td class="left-align">{in_progress_count}</td>
+            </tr>
+            <tr>
+                <td class="left-align">Reopened</td>
+                <td class="left-align">{reopened_count}</td>
+            </tr>
+        </table>
+
+        <table>
+            <tr class="summary-header"><td colspan="2">Assignee Summary</td></tr>
+            <tr>
+                <td class="left-align">Assignee</td>
+                <td class="left-align">Total</td>
+            </tr>
+        """
+
+        for assignee, count in sorted_assignees:
+            html_content += f"""
+            <tr>
+                <td class="left-align">{assignee}</td>
+                <td class="left-align">{count}</td>
+            </tr>
+            """
+
+        html_content += f"""
+            <tr>
+                <td class="left-align">Unassigned</td>
+                <td class="left-align">{unassigned_count}</td>
+            </tr>
+        </table>
+
         <table>
             <tr>
-                <th class="left-align">SL.No</th>
+                <th class="left-align">SL. No</th>
                 <th class="left-align">Jira Number</th>
                 <th class="left-align">Status</th>
                 <th class="left-align">Assignee</th>
@@ -202,16 +287,16 @@ for project_key in project_keys:
 
         # Add rows to HTML content with clickable links
         for index, issue in enumerate(open_issues, start=1):
-            jira_number = issue['key'][:15]
-                        status = issue['fields']['status']['name'][:20]
-            assignee = (issue['fields']['assignee']['displayName'] if 'assignee' in issue['fields'] and issue['fields']['assignee'] else 'Unassigned')[:20]
-            summary = issue['fields']['summary'][:50]
+            jira_number = issue['key'][:jira_number_width]
+            status = issue['fields']['status']['name'][:status_width]
+            assignee = (issue['fields']['assignee']['displayName'] if 'assignee' in issue['fields'] and issue['fields']['assignee'] else 'Unassigned')[:assignee_width]
+            summary = issue['fields']['summary'][:summary_width]
             created_date = datetime.strptime(issue['fields']['created'], "%Y-%m-%dT%H:%M:%S.%f%z").strftime("%Y-%m-%d")
-            
+
             # Calculate age of the ticket
-            created_date = datetime.strptime(created_date, "%Y-%m-%d")
-            age_of_ticket_days = (datetime.now(timezone.utc) - created_date).days
-            
+            created_date_dt = datetime.strptime(created_date, "%Y-%m-%d")
+            age_of_ticket_days = (datetime.now(timezone.utc) - created_date_dt).days
+
             # Determine color based on age
             if age_of_ticket_days < 30:
                 age_color = 'green'
@@ -239,19 +324,17 @@ for project_key in project_keys:
         # Close the HTML content for the project key
         html_content += """
         </table>
+        </div>
         """
 
-        # Add project key to the side key content
-        side_key_content += f"<li><a href='javascript:void(0)' onclick='showProject(\"{project_key}\")'>{project_key}</a></li>"
-
-# Close the side key content
-side_key_content += "</ul></div>"
-
-# Close the HTML content
+# Add script to show the first project by default
 html_content += f"""
+<script>
+    document.getElementById('{project_keys[0]}').style.display = 'block';
+</script>
+</div>
 </body>
 </html>
-{side_key_content}
 """
 
 # Save the HTML content to a file
@@ -262,4 +345,3 @@ print(f"HTML file '{html_filename}' created successfully.")
 
 # Send email with HTML content
 send_email(sender_email, sender_password, receiver_email, subject, html_content)
-
