@@ -1,0 +1,14 @@
+index=index_name host=hostnames sourcetype=source_type source=source_name 
+("responseMessage\":\"message timeout\"" OR ("Issuer Timeout" OR "Reject Message" OR "Issuer Down" OR "System error") OR ("OUT_MESSAGE" AND "responseMessage" AND "hostResponseCode"))
+| rex field=_raw " .(?<issuer_field>\|([A-Z]+)\|)"
+| eval issuer_field=mvindex(split(issuer_field, "|"), 1)
+| eval Issuer=if(match(issuer_field, "SYNCHR"), "Synchrony", null())
+| eval date=strftime(_time, "%Y-%m-%d")
+| eval is_failure=if("responseMessage\":\"message timeout\"" OR ("Issuer Timeout" OR "Reject Message" OR "Issuer Down" OR "System error"), 1, 0)
+| eval is_success=if("OUT_MESSAGE" AND "responseMessage" AND match(_raw, "hostResponseCode\":\"\\d+"), 1, 0)
+| dedup UUID
+| stats sum(is_failure) as failure_count, sum(is_success) as success_count by date, Issuer
+| eval total_count=success_count + failure_count
+| eval success_percentage=round((success_count/total_count)*100, 2)
+| eval failure_percentage=round((failure_count/total_count)*100, 2)
+| table date, Issuer, success_count, failure_count, success_percentage, failure_percentage
