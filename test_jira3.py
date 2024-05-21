@@ -106,6 +106,7 @@ html_content = """
             left: 0;
             background-color: #111;
             padding-top: 20px;
+            display: none; /* Hide the sidenav by default */
         }
         .sidenav a {
             padding: 8px 8px 8px 16px;
@@ -118,9 +119,9 @@ html_content = """
             color: #f1f1f1;
         }
         .content {
-            margin-left: 220px;
+            margin-left: 0; /* Adjusted for hidden sidenav */
             padding: 20px;
-            width: calc(100% - 220px);
+            width: 100%; /* Adjusted for hidden sidenav */
         }
         table {
             border-collapse: collapse;
@@ -131,7 +132,8 @@ html_content = """
             border: 1px solid black;
             padding: 8px;
             text-align: center;
-            background-color: #33FFBE;
+            background-color: #A533FF;
+            color: white;
             font-weight: bold;
             font-family: Arial, sans-serif;
         }
@@ -230,58 +232,25 @@ for project_key in project_keys:
 
         sorted_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)
 
+        # Sort issues by age in descending order
+        open_issues.sort(
+            key=lambda issue: (datetime.now(timezone.utc) - datetime.strptime(issue['fields']['created'], "%Y-%m-%dT%H:%M:%S.%f%z")).days, 
+            reverse=True
+        )
+
         # Add project key content
         html_content += f"""
         <div id="{project_key}" class="project-content" style="display: none;">
         <h1 class="main-header">Jira Open Issues for {project_key}</h1>
         <table>
-            <tr class="summary-header"><td colspan="2">Issue Summary</td></tr>
             <tr>
-                <td class="left-align">Open</td>
-                <td class="left-align">{open_count}</td>
-            </tr>
-            <tr>
-                <td class="left-align">In Progress</td>
-                <td class="left-align">{in_progress_count}</td>
-            </tr>
-            <tr>
-                <td class="left-align">Reopened</td>
-                <td class="left-align">{reopened_count}</td>
-            </tr>
-        </table>
-
-        <table>
-            <tr class="summary-header"><td colspan="2">Assignee Summary</td></tr>
-            <tr>
-                <td class="left-align">Assignee</td>
-                <td class="left-align">Total</td>
-            </tr>
-        """
-
-        for assignee, count in sorted_assignees:
-            html_content += f"""
-            <tr>
-                <td class="left-align">{assignee}</td>
-                <td class="left-align">{count}</td>
-            </tr>
-            """
-
-        html_content += f"""
-            <tr>
-                <td class="left-align">Unassigned</td>
-                <td class="left-align">{unassigned_count}</td>
-            </tr>
-        </table>
-
-        <table>
-            <tr>
-                <th class="left-align">SL. No</th>
-                <th class="left-align">Jira Number</th>
-                <th class="left-align">Status</th>
-                <th class="left-align">Assignee</th>
-                <th class="left-align">Summary</th>
-                <th class="left-align">Created Date</th>
-                <th class="left-align">Age of Ticket</th>
+                <th class="center-align">SL. No</th>
+                <th class="center-align">Jira Number</th>
+                <th class="center-align">Status</th>
+                <th class="center-align">Assignee</th>
+                <th class="center-align">Summary</th>
+                <th class="center-align">Created Date</th>
+                <th class="center-align">Age of Ticket</th>
             </tr>
         """
 
@@ -321,8 +290,62 @@ for project_key in project_keys:
             """
             html_content += row_html
 
-        # Close the HTML content for the project key
+        # Close the HTML content for the open issues table
         html_content += """
+        </table>
+        """
+
+        # Add Issue Summary table
+        html_content += f"""
+        <table>
+            <tr>
+                <th class="summary-header" colspan="2">Issue Summary</th>
+            </tr>
+            <tr>
+                <td class="left-align">Category</td>
+                <td class="left-align">Total</td>
+            </tr>
+            <tr>
+                <td class="left-align">Open</td>
+                <td class="left-align">{open_count}</td>
+            </tr>
+            <tr>
+                <td class="left-align">In Progress</td>
+                <td class="left-align">{in_progress_count}</td>
+            </tr>
+            <tr>
+                <td class="left-align">Reopened</td>
+                <td class="left-align">{reopened_count}</td>
+            </tr>
+        </table>
+        """
+
+        # Add Assignee Summary table
+        html_content += f"""
+        <table>
+            <tr>
+                <th class="summary-header" colspan="2">Assignee Summary</th>
+            </tr>
+            <tr>
+                <td class="left-align">Assignee</td>
+                <td class="left-align">Total</td>
+            </tr>
+        """
+
+        # Add assignee rows
+        for assignee, count in sorted_assignees:
+            html_content += f"""
+            <tr>
+                <td class="left-align">{assignee}</td>
+                <td class="left-align">{count}</td>
+            </tr>
+            """
+
+        html_content += f"""
+            <tr>
+                <td class="left-align">Unassigned</td>
+                <td class="left-align">{unassigned_count}</td>
+            </tr>
         </table>
         </div>
         """
