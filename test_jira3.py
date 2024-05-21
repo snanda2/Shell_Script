@@ -106,7 +106,6 @@ html_content = """
             left: 0;
             background-color: #111;
             padding-top: 20px;
-            display: none; /* Hide the sidenav by default */
         }
         .sidenav a {
             padding: 8px 8px 8px 16px;
@@ -119,9 +118,9 @@ html_content = """
             color: #f1f1f1;
         }
         .content {
-            margin-left: 0; /* Adjusted for hidden sidenav */
+            margin-left: 200px;
             padding: 20px;
-            width: 100%; /* Adjusted for hidden sidenav */
+            width: calc(100% - 200px);
         }
         table {
             border-collapse: collapse;
