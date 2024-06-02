@@ -6,77 +6,94 @@ from datetime import datetime
 import argparse
 import psutil
 
+def is_process_running(process_name):
+    """Checks if a process is running by name.
+
+    Args:
+        process_name (str): The name of the process to check.
+
+    Returns:
+        bool: True if the process is running, False otherwise.
+    """
+    for process in psutil.process_iter(['pid', 'name']):
+        if process.info['name'] == process_name:
+            return True
+    return False
+
 # Configuration for commands based on client and server type
 COMMANDS = {
     "client1": {
         "api_server": {
             "pre_validation": [
-                "uname -r",  # Assuming "kernel version" means checking the kernel version
+                "echo Kernel version below:",
+                "uname -r",
+                "echo Checking mailbox status below:",
                 "mbcmd",
                 "mbcmd tasks"
             ],
             "shutdown": [
-                "echo Client1 API Shutdown Command 1",
-                "echo Client1 API Shutdown Command 2"
+                "./shutdown.sh",
+                "kill oentsrv"
             ],
             "processes": ["splunkd", "nxagentd", "producer"]
         },
         "wso2_server": {
-            "pre_validation": [
-                "ps -ef | grep wso2 | grep -v grep"
-            ],
+            "pre_validation": [],
             "shutdown": [
-                "echo Client1 WSO2 Shutdown Command 1",
-                "echo Client1 WSO2 Shutdown Command 2"
-            ]
+                "./shutdown.sh",
+                "kill oentsrv"
+            ],
+            "processes": ["wso2"]
         },
         # Add other server types for client1...
     },
     "client2": {
         "api_server": {
             "pre_validation": [
+                "echo Kernel version below:",
                 "uname -r",
+                "echo Checking mailbox status below:",
                 "mbcmd",
                 "mbcmd tasks"
             ],
             "shutdown": [
-                "echo Client2 API Shutdown Command 1",
-                "echo Client2 API Shutdown Command 2"
+                "./shutdown.sh",
+                "kill oentsrv"
             ],
             "processes": ["splunkd", "nxagentd", "producer"]
         },
         "wso2_server": {
-            "pre_validation": [
-                "ps -ef | grep wso2 | grep -v grep"
-            ],
+            "pre_validation": [],
             "shutdown": [
-                "echo Client2 WSO2 Shutdown Command 1",
-                "echo Client2 WSO2 Shutdown Command 2"
-            ]
+                "./shutdown.sh",
+                "kill oentsrv"
+            ],
+            "processes": ["wso2"]
         },
         # Add other server types for client2...
     },
     "client3": {
         "api_server": {
             "pre_validation": [
+                "echo Kernel version below:",
                 "uname -r",
+                "echo Checking mailbox status below:",
                 "mbcmd",
                 "mbcmd tasks"
             ],
             "shutdown": [
-                "echo Client3 API Shutdown Command 1",
-                "echo Client3 API Shutdown Command 2"
+                "./shutdown.sh",
+                "kill oentsrv"
             ],
             "processes": ["splunkd", "nxagentd", "producer"]
         },
         "wso2_server": {
-            "pre_validation": [
-                "ps -ef | grep wso2 | grep -v grep"
-            ],
+            "pre_validation": [],
             "shutdown": [
-                "echo Client3 WSO2 Shutdown Command 1",
-                "echo Client3 WSO2 Shutdown Command 2"
-            ]
+                "./shutdown.sh",
+                "kill oentsrv"
+            ],
+            "processes": ["wso2"]
         },
         # Add other server types for client3...
     }
@@ -136,23 +153,10 @@ class ServerManager:
         else:
             return "unknown_server"
 
-    def check_process_running(self, process_name):
-        for proc in psutil.process_iter(['pid', 'name']):
-            if process_name in proc.info['name']:
-                return True
-        return False
-
     def execute_commands(self, command_type):
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
             return
-
-        if command_type == "pre_validation" and "processes" in COMMANDS[self.client][self.server_type]:
-            processes = COMMANDS[self.client][self.server_type]["processes"]
-            for process in processes:
-                if not self.check_process_running(process):
-                    logging.error(f"Process {process} is not running")
-                    raise Exception(f"Process {process} is not running")
 
         commands = COMMANDS[self.client][self.server_type].get(command_type, [])
         for command in commands:
@@ -165,10 +169,20 @@ class ServerManager:
                 error_output = e.stderr.decode().strip()
                 logging.error(f"Failed to execute command: {command}")
                 logging.error(f"Error: {error_output}")
-                raise
+                # Log the error to the failed log file but do not raise an exception to stop the script
+                logging.getLogger().error(f"Failed to execute command: {command}", exc_info=True)
 
     def pre_validation(self):
         logging.info("Starting pre-validation...")
+        
+        # Check processes using psutil and log their statuses
+        processes = COMMANDS[self.client][self.server_type].get("processes", [])
+        for process in processes:
+            if is_process_running(process):
+                logging.info(f"Process {process} is running")
+            else:
+                logging.warning(f"Process {process} is not running")
+
         self.execute_commands("pre_validation")
 
     def shutdown(self):
