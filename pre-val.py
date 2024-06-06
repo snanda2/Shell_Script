@@ -8,6 +8,20 @@ from datetime import datetime
 import argparse
 import psutil
 
+def is_process_running(process_name):
+    """Checks if a process is running by name.
+
+    Args:
+        process_name (str): The name of the process to check.
+
+    Returns:
+        bool: True if the process is running, False otherwise.
+    """
+    for process in psutil.process_iter(['pid', 'name']):
+        if process.info['name'] == process_name:
+            return True
+    return False
+
 # Constants for log directory and file extensions
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
@@ -189,11 +203,15 @@ class ServerManager:
             result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output = result.stdout.decode().strip()
             logging.info(f"Executed command: {command}")
-            logging.info(f"Output: {output}")
+            # Log the command output with line breaks preserved
+            for line in output.split('\n'):
+                logging.info(line)
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
-            logging.error(f"Error: {error_output}")
+            # Log the error output with line breaks preserved
+            for line in error_output.split('\n'):
+                logging.error(line)
             logging.getLogger().error(f"Failed to execute command: {command}", exc_info=True)
 
     def pre_validation(self):
@@ -243,4 +261,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
