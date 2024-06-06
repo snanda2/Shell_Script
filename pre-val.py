@@ -203,15 +203,13 @@ class ServerManager:
             result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output = result.stdout.decode().strip()
             logging.info(f"Executed command: {command}")
-            # Log the command output with line breaks preserved
-            for line in output.split('\n'):
-                logging.info(line)
+            # Log the command output as a single entry to preserve line breaks
+            logging.info(f"Output:\n{output}")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
-            # Log the error output with line breaks preserved
-            for line in error_output.split('\n'):
-                logging.error(line)
+            # Log the error output as a single entry to preserve line breaks
+            logging.error(f"Error:\n{error_output}")
             logging.getLogger().error(f"Failed to execute command: {command}", exc_info=True)
 
     def pre_validation(self):
