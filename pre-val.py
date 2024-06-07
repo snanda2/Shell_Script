@@ -9,7 +9,7 @@ import argparse
 import psutil
 
 def is_process_running(process_name):
-    """Checks if a process is running by name.
+    """Checks if a process is running by name or in its command line arguments.
 
     Args:
         process_name (str): The name of the process to check.
@@ -17,8 +17,8 @@ def is_process_running(process_name):
     Returns:
         bool: True if the process is running, False otherwise.
     """
-    for process in psutil.process_iter(['pid', 'name']):
-        if process.info['name'] == process_name:
+    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if process_name in process.info['name'] or any(process_name in cmd for cmd in process.info['cmdline']):
             return True
     return False
 
@@ -34,7 +34,7 @@ SERVER_SPECIFIC_COMMANDS = {
             "echo Kernel version below:",
             "uname -r",
             "echo Checking mailbox status below:",
-            "mbcmd",
+            "echo -e 'exit' | mbcmd",
             "mbcmd tasks"
         ],
         "shutdown": [
@@ -85,7 +85,7 @@ COMMANDS = {
                 "echo Kernel version below:",
                 "uname -r",
                 "echo Checking mailbox status below:",
-                "mbcmd",
+                "echo -e 'exit' | mbcmd",
                 "mbcmd tasks"
             ],
             "shutdown": [
@@ -203,14 +203,24 @@ class ServerManager:
             result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output = result.stdout.decode().strip()
             logging.info(f"Executed command: {command}")
-            # Log the command output as a single entry to preserve line breaks
-            logging.info(f"Output:\n{output}")
+            
+            if 'mbcmd' in command:
+                filtered_output = self._filter_mbcmd_output(output)
+                logging.info(f"Output:\n{filtered_output}")
+            else:
+                logging.info(f"Output:\n{output}")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
-            # Log the error output as a single entry to preserve line breaks
             logging.error(f"Error:\n{error_output}")
             logging.getLogger().error(f"Failed to execute command: {command}", exc_info=True)
+
+    def _filter_mbcmd_output(self, output):
+        """Filter the mbcmd output to extract the specific required line."""
+        for line in output.splitlines():
+            if "IST Mail Box up since" in line:
+                return line
+        return "Desired line not found in mbcmd output."
 
     def pre_validation(self):
         """Perform pre-validation tasks."""
