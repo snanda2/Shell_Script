@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import socket
 import subprocess
@@ -204,7 +202,7 @@ class ServerManager:
             output = result.stdout.decode().strip()
             logging.info(f"Executed command: {command}")
             
-            if 'mbcmd' in command:
+            if command == "echo -e 'exit' | mbcmd":
                 filtered_output = self._filter_mbcmd_output(output)
                 logging.info(f"Output:\n{filtered_output}")
             else:
