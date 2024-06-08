@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import socket
 import subprocess
@@ -126,17 +128,18 @@ COMMANDS = {
 }
 
 class ServerManager:
-    def __init__(self):
+    def __init__(self, action):
         self.hostname = socket.gethostname()
         self.client = self.identify_client()
         self.server_type = self.identify_server_type()
+        self.action = action
         self.setup_logging()
 
     def setup_logging(self):
         """Set up logging for the script."""
         os.makedirs(LOG_DIR, exist_ok=True)
         date_str = datetime.now().strftime('%Y%m%d')
-        base_log_filename = f"{self.hostname}_{self.client}_{date_str}"
+        base_log_filename = f"{self.hostname}_{self.client}_{date_str}_{self.action}"
         self.log_filename = os.path.join(LOG_DIR, f"{base_log_filename}{LOG_EXTENSION}")
         self.failed_log_filename = os.path.join(LOG_DIR, f"{base_log_filename}{FAILED_LOG_SUFFIX}{LOG_EXTENSION}")
 
@@ -193,7 +196,15 @@ class ServerManager:
 
         commands = COMMANDS[self.client][self.server_type].get(command_type, [])
         for command in commands:
-            self._execute_command(command)
+            if "kill" in command:
+                process_name = command.split()[1]
+                if is_process_running(process_name):
+                    logging.info(f"Process {process_name} is running, proceeding to kill.")
+                    self._execute_command(command)
+                else:
+                    logging.info(f"Process {process_name} is not running.")
+            else:
+                self._execute_command(command)
 
     def _execute_command(self, command):
         """Execute a single command and log the result."""
@@ -240,19 +251,19 @@ class ServerManager:
         logging.info("Starting shutdown...")
         self.execute_commands("shutdown")
 
-    def run(self, action):
+    def run(self):
         """Run the specified action (pre-validation or shutdown)."""
         logging.info(f"Hostname: {self.hostname}")
         logging.info(f"Identified client: {self.client}")
         logging.info(f"Identified server type: {self.server_type}")
 
         try:
-            if action == "prevalidation":
+            if self.action == "prevalidation":
                 self.pre_validation()
-            elif action == "shutdown":
+            elif self.action == "shutdown":
                 self.shutdown()
             else:
-                logging.error(f"Unknown action: {action}")
+                logging.error(f"Unknown action: {self.action}")
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
 
@@ -262,8 +273,8 @@ def main():
     parser.add_argument("action", choices=["prevalidation", "shutdown"], help="Action to perform")
     args = parser.parse_args()
 
-    manager = ServerManager()
-    manager.run(args.action)
+    manager = ServerManager(args.action)
+    manager.run()
 
 if __name__ == "__main__":
     main()
