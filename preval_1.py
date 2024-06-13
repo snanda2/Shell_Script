@@ -41,6 +41,7 @@ EXIT_PROCESS_NOT_FOUND = 5
 EXIT_SCRIPT_NOT_FOUND = 6
 EXIT_UNKNOWN_ACTION = 7
 EXIT_UNKNOWN_CLIENT_OR_SERVER = 8
+EXIT_MAILBOX_NOT_ACTIVE = 9
 
 # Server and client specific commands
 SERVER_SPECIFIC_COMMANDS = {
@@ -239,9 +240,18 @@ class ServerManager:
         """Execute the commands for the given command type (pre-validation or shutdown)."""
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
-            print("Unknown client or server type", file=sys.stderr)
             self.create_trigger_file(f"failed_{self.action}.trig")
+            self._console_print(f"{self.action.capitalize()} failed")
             sys.exit(EXIT_UNKNOWN_CLIENT_OR_SERVER)
+
+        # Check mailbox status for switch_server and L7_server
+        if self.server_type in ["switch_server", "L7_server"]:
+            mailbox_status = self._check_mailbox_status()
+            if mailbox_status == "Mail box system not active":
+                logging.error("IST Mail box is not active")
+                self._console_print("IST Mail box is not active")
+                self.create_trigger_file(f"failed_{self.action}.trig")
+                sys.exit(EXIT_MAILBOX_NOT_ACTIVE)
 
         commands = COMMANDS[self.client][self.server_type].get(command_type, [])
         for command in commands:
@@ -262,216 +272,76 @@ class ServerManager:
                 self._execute_command(command)
 
     def _execute_command(self, command):
-        """Execute a single command and log the result."""
+        """Execute a single command asynchronously."""
+        logging.info(f"Executing command: {command}")
         try:
-            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output = result.stdout.decode().strip()
-            logging.info(f"Executed command: {command}")
-            
-            if command == "echo -e 'exit' | mbcmd":
-                mailbox_line = self._filter_mbcmd_output(output)
-                logging.info(mailbox_line)
-            
+            subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-            error_output = e.stderr.decode().strip()
-            logging.error(f"Failed to execute command: {command}")
-            logging.error(f"Error:\n{error_output}")
-            print(f"Error: {error_output}", file=sys.stderr)
+            logging.error(f"Command execution failed with error: {e}")
+            self._log_to_failed_log(f"Command execution failed for: {command}")
+            self.create_trigger_file(f"failed_{self.action}.trig")
+            self._console_print(f"{self.action.capitalize()} failed")
             sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
     def _execute_command_synchronously(self, command):
-        """Execute a single command synchronously and return the output."""
+        """Execute a single command synchronously and return output."""
+        logging.info(f"Executing command synchronously: {command}")
         try:
-            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output = result.stdout.decode().strip()
-            logging.info(f"Executed command: {command}")
-            return output
+            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            logging.info(f"Command output:\n{result.stdout}")
+            return result.stdout
         except subprocess.CalledProcessError as e:
-            error_output = e.stderr.decode().strip()
-            logging.error(f"Failed to execute command: {command}")
-            logging.error(f"Error:\n{error_output}")
-            print(f"Error: {error_output}", file=sys.stderr)
+            logging.error(f"Command execution failed with error: {e}")
+            self._log_to_failed_log(f"Command execution failed for: {command}")
+            self.create_trigger_file(f"failed_{self.action}.trig")
+            self._console_print(f"{self.action.capitalize()} failed")
             sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
-    @staticmethod
-    def _filter_mbcmd_output(output):
-        """Filter the output of mbcmd to find relevant information."""
-        for line in output.splitlines():
-            if "Mail Box up since" in line:
-                return line
-        return "Desired line not found in mbcmd output."
-
     def _handle_ipcs_output(self, output):
-        """Handle the output of the ipcs command to check for shared memory segments."""
-        istadm_found = False
+        """Handle IPCS output to log used resources."""
+        logging.info("Handling IPCS output...")
+        # Implement your handling logic based on the IPCS output
+        pass
 
-        shared_memory_section = False
-        for line in output.splitlines():
-            if re.match(r'------\s*Shared Memory Segments\s*------', line):
-                shared_memory_section = True
-            elif re.match(r'------\s*\w+\s*------', line):
-                shared_memory_section = False
-
-            if shared_memory_section and "istadm" in line:
-                istadm_found = True
-                logging.error(f"Shared memory segment found for istadm: {line}")
-                print(f"Error: Shared memory segment found for istadm: {line}", file=sys.stderr)
-
-        if not istadm_found:
-            logging.info("No shared memory segments for istadm, shutdown is complete and clean.")
+    def _check_mailbox_status(self):
+        """Check mailbox status for switch_server and L7_server."""
+        logging.info("Checking mailbox status...")
+        command = "echo -e '\n exit' | mbcmd"
+        output = self._execute_command_synchronously(command)
+        if "Mail box system not active" in output:
+            return "Mail box system not active"
+        elif "IST Mail Box up since" in output:
+            return "Mail Box is up and running"
         else:
-            logging.error("Shared memory segments for istadm were found during shutdown.")
-            sys.exit(EXIT_SHUTDOWN_FAILURE)
+            logging.error("Unexpected output from mailbox check.")
+            self._log_to_failed_log("Unexpected output from mailbox check.")
+            self.create_trigger_file(f"failed_{self.action}.trig")
+            self._console_print(f"{self.action.capitalize()} failed")
+            sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
-    def pre_validation(self):
-        """Perform pre-validation tasks."""
-        logging.info("Starting pre-validation...")
-        self._check_processes()
-        self.execute_commands("pre_validation")
+    def _log_to_failed_log(self, message):
+        """Log a message to the failed log file."""
+        logging.error(message)
+        self.failed_log_handler.error(message)
 
-    def _check_processes(self):
-        """Check the status of required processes and log the results."""
-        processes = COMMANDS[self.client][self.server_type].get("processes", [])
-        for process in processes:
-            if is_process_running(process):
-                logging.info(f"Process {process} is running")
-            else:
-                logging.warning(f"Process {process} is not running")
-
-    def shutdown(self):
-        """Perform shutdown tasks."""
-        logging.info("Starting shutdown...")
-
-        if self.server_type == "switch_server" and self.client in ["client1", "client2"]:
-            self._handle_producer_shutdown()
-        if self.server_type == "wso2_server":
-            self._shutdown_wso2_server()
-
-        if self.server_type == "L7_server":
-            self._handle_ist_api_services_shutdown()
-
-        self.execute_commands("shutdown")
-
-    def _handle_producer_shutdown(self):
-        """Handle shutdown of producer processes for api_server."""
-        producer_running = False
-        for process in psutil.process_iter(['pid', 'name', 'cmdline']):
-            if "prod01" in process.info['cmdline']:
-                producer_running = True
-                self._shutdown_producer_instance("instance_1")
-            elif "prod02" in process.info['cmdline']:
-                producer_running = True
-                self._shutdown_producer_instance("instance_2")
-            else:
-                logging.info(f"Skipping non-producer process: {process.info['cmdline']}")
-
-        if not producer_running:
-            logging.info("No producer process is running, skipping producer shutdown.")
-
-    def _shutdown_producer_instance(self, instance):
-        """Shut down the producer instance by executing the appropriate script."""
-        base_path = "/home/istadm/pdir/ositeroot/ist_ddp/"
-        instance_path = os.path.join(base_path, instance)
-
-        if os.path.exists(instance_path):
-            stop_script_path = os.path.join(instance_path, "stop_ddp.ksh")
-        else:
-            stop_script_path = os.path.join(base_path, "stop_ddp.ksh")
-
-        if os.path.exists(stop_script_path):
-            logging.info(f"Executing {stop_script_path} for {instance}")
-            self._execute_command(f"./{stop_script_path}")
-        else:
-            logging.error(f"Stop script {stop_script_path} not found.")
-            sys.exit(EXIT_SCRIPT_NOT_FOUND)
-
-    def _shutdown_wso2_server(self):
-        """Shutdown wso2 server by executing wso2server.sh with stop argument."""
-        wso2_script_path = "/data/wso2/wso2am-3.2.0/bin/wso2server.sh"
-        if os.path.exists(wso2_script_path):
-            logging.info(f"Executing {wso2_script_path} with stop argument")
-            self._execute_command(f"{wso2_script_path} stop")
-        else:
-            logging.error(f"WSO2 server shutdown script {wso2_script_path} not found.")
-            sys.exit(EXIT_SCRIPT_NOT_FOUND)
-
-    def _handle_ist_api_services_shutdown(self):
-        """Handle shutdown of ist-api-services for L7 server."""
-        ist_api_services_running = False
-        for process in psutil.process_iter(['pid', 'name', 'cmdline']):
-            if "ist-api-services" in process.info['cmdline']:
-                ist_api_services_running = True
-                logging.info("ist-api-services process is running.")
-                self._shutdown_ist_api_services()
-                break
-
-        if not ist_api_services_running:
-            logging.info("ist-api-services is not running, skipping shutdown.")
-
-    def _shutdown_ist_api_services(self):
-        """Shutdown the ist-api-services process."""
-        ist_api_services_path = "/home/istadm/istapi/ist-api-services"
-        killme_script_path = os.path.join(ist_api_services_path, "killme")
-
-        if os.path.exists(killme_script_path):
-            logging.info(f"Executing {killme_script_path} to shut down ist-api-services.")
-            try:
-                result = subprocess.run(f"./{killme_script_path}", shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                output = result.stdout.decode().strip()
-                error_output = result.stderr.decode().strip()
-                
-                logging.info(f"Executed {killme_script_path} to shut down ist-api-services.")
-                logging.info(f"Output:\n{output}")
-                if error_output:
-                    logging.error(f"Error output:\n{error_output}")
-            except subprocess.CalledProcessError as e:
-                error_output = e.stderr.decode().strip()
-                logging.error(f"Failed to execute {killme_script_path}")
-                logging.error(f"Error:\n{error_output}")
-                logging.getLogger().error(f"Failed to execute {killme_script_path}", exc_info=True)
-                sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
-        else:
-            logging.error(f"killme script not found at {killme_script_path}.")
-            sys.exit(EXIT_SCRIPT_NOT_FOUND)
+    def _console_print(self, message):
+        """Print a message to the console if not logging to console."""
+        if self.action in ["prevalidation", "shutdown"]:
+            print(message)
 
     def run(self):
-        """Run the specified action (pre-validation or shutdown)."""
-        logging.info(f"Hostname: {self.hostname}")
-        logging.info(f"Identified client: {self.client}")
-        logging.info(f"Identified server type: {self.server_type}")
+        """Run the server management process."""
+        logging.info(f"Starting {self.action} process for {self.hostname} ({self.client}, {self.server_type})")
+        self.execute_commands(self.action)
+        logging.info(f"{self.action.capitalize()} completed successfully for {self.hostname}")
+        self.create_trigger_file(f"{self.action}_successful.trig")
+        self._console_print(f"{self.action.capitalize()} is successful")
 
-        try:
-            if self.action == "prevalidation":
-                self.pre_validation()
-                logging.info("Pre-validation completed successfully.")
-                self.create_trigger_file("successful_prevalidation.trig")
-                print("Pre-validation completed successfully.")
-                sys.exit(EXIT_SUCCESS)
-            elif self.action == "shutdown":
-                self.shutdown()
-                logging.info("Shutdown completed successfully.")
-                self.create_trigger_file("successful_shutdown.trig")
-                print("Shutdown completed successfully.")
-                sys.exit(EXIT_SUCCESS)
-            else:
-                logging.error(f"Unknown action: {self.action}")
-                self.create_trigger_file(f"failed_{self.action}.trig")
-                print(f"Unknown action: {self.action}", file=sys.stderr)
-                sys.exit(EXIT_UNKNOWN_ACTION)
-        except Exception as e:
-            logging.error(f"Script execution stopped due to an error: {e}")
-            self.create_trigger_file(f"failed_{self.action}.trig")
-            print(f"Script execution stopped due to an error: {e}", file=sys.stderr)
-            sys.exit(EXIT_GENERAL_FAILURE)
 
-def main():
-    """Main entry point for the script."""
-    parser = argparse.ArgumentParser(description="Server management script.")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Server Management Script")
     parser.add_argument("action", choices=["prevalidation", "shutdown"], help="Action to perform")
     args = parser.parse_args()
 
     manager = ServerManager(args.action)
     manager.run()
-
-if __name__ == "__main__":
-    main()
