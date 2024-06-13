@@ -50,7 +50,7 @@ SERVER_SPECIFIC_COMMANDS = {
             "echo Kernel version below:",
             "uname -r",
             "echo Checking mailbox status below:",
-            "echo -e '\n exit' | mbcmd",
+            "echo -e '\\n exit' | mbcmd",
             "mbcmd tasks"
         ],
         "shutdown": [
@@ -67,7 +67,7 @@ SERVER_SPECIFIC_COMMANDS = {
             "echo Kernel version below:",
             "uname -r",
             "echo Checking mailbox status below:",
-            "echo -e '\n exit' | mbcmd",
+            "echo -e '\\n exit' | mbcmd",
             "mbcmd tasks"
         ],
         "shutdown": [
@@ -79,7 +79,7 @@ SERVER_SPECIFIC_COMMANDS = {
         "processes": ["istnodeagt", "ist-api-services"]
     },
     "wso2_server": {
-        "pre_validation":[],
+        "pre_validation": [],
         "shutdown": [
             "/data/wso2/wso2am-3.2.0/bin/wso2server.sh stop",
         ],
@@ -115,7 +115,7 @@ COMMANDS = {
                 "echo Kernel version below:",
                 "uname -r",
                 "echo Checking mailbox status below:",
-                "echo -e '\n exit' | mbcmd",
+                "echo -e '\\n exit' | mbcmd",
                 "mbcmd tasks"
             ],
             "shutdown": [
@@ -182,7 +182,8 @@ class ServerManager:
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
                 logging.FileHandler(self.log_filename),
-                logging.FileHandler(self.failed_log_filename)
+                logging.FileHandler(self.failed_log_filename),
+                logging.StreamHandler(sys.stdout)  # Log to console as well
             ]
         )
 
@@ -235,16 +236,8 @@ class ServerManager:
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
             self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+            print("Unknown client or server type", file=sys.stderr)
             sys.exit(EXIT_UNKNOWN_CLIENT_OR_SERVER)
-
-        if self.server_type in ["switch_server", "L7_server"]:
-            mailbox_status = self._check_mailbox_status()
-            if "Mail box system not active" in mailbox_status:
-                logging.error("IST Mail box is not active. Exiting script.")
-                self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
-                print("IST Mail box is not active.")
-                sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
-            logging.info("IST Mail box is up. Proceeding with commands.")
 
         commands = COMMANDS[self.client][self.server_type].get(command_type, [])
         for command in commands:
@@ -256,15 +249,15 @@ class ServerManager:
                 else:
                     logging.info(f"Process {process_name} is not running.")
             elif "cleanipc.sh" in command:
-                self._execute_command(command)
+                self._execute_command_synchronously(command)
                 time.sleep(10)
             elif "ipcs" in command:
-                output = self._execute_command(command, capture_output=True)
+                output = self._execute_command_synchronously(command)
                 self._handle_ipcs_output(output)
             else:
                 self._execute_command(command)
 
-    def _execute_command(self, command, capture_output=False):
+    def _execute_command(self, command):
         """Execute a single command and log the result."""
         logging.debug(f"Executing command: {command}")
         try:
@@ -277,22 +270,45 @@ class ServerManager:
             if error_output:
                 logging.error(f"Error output:\n{error_output}")
 
-            if capture_output:
-                return output
+            if command == "echo -e '\\n exit' | mbcmd":
+                filtered_output = self._filter_mbcmd_output(output)
+                logging.info(f"Filtered Output:\n{filtered_output}")
+                if "Mail Box up since" in filtered_output:
+                    logging.info("Mailbox is active. Continuing with the rest of the script.")
+                elif "Mail box system not active" in filtered_output:
+                    logging.error("Mail box system not active. Stopping execution.")
+                    self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+                    print("Mail box system not active. Script will not execute further.")
+                    sys.exit(EXIT_GENERAL_FAILURE)
 
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
             logging.error(f"Error:\n{error_output}")
-            self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+            print(f"Error: {error_output}", file=sys.stderr)
             sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
-    def _filter_mbcmd_output(self, output):
+    def _execute_command_synchronously(self, command):
+        """Execute a single command synchronously and return the output."""
+        logging.debug(f"Executing command: {command}")
+        try:
+            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode().strip()
+            logging.info(f"Executed command: {command}")
+            logging.info(f"Output:\n{output}")
+            return output
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode().strip()
+            logging.error(f"Failed to execute command: {command}")
+            logging.error(f"Error:\n{error_output}")
+            print(f"Error: {error_output}", file=sys.stderr)
+            sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
+
+    @staticmethod
+    def _filter_mbcmd_output(output):
         """Filter the output of mbcmd to find relevant information."""
         for line in output.splitlines():
-            if "Mail Box up since" in line:
-                return line
-            if "Mail box system not active" in line:
+            if "Mail Box up since" in line or "Mail box system not active" in line:
                 return line
         return "Desired line not found in mbcmd output."
 
@@ -318,15 +334,12 @@ class ServerManager:
             logging.error("Shared memory segments for istadm were found during shutdown.")
             sys.exit(EXIT_SHUTDOWN_FAILURE)
 
-    def _check_mailbox_status(self):
-        """Check the mailbox status for switch_server or L7_server."""
-        command = "echo -e '\\n exit' | mbcmd"
-        output = self._execute_command(command, capture_output=True)
-        return self._filter_mbcmd_output(output)
-
     def pre_validation(self):
         """Perform pre-validation tasks."""
         logging.info("Starting pre-validation...")
+        if self.server_type in ["switch_server", "L7_server"]:
+            mailbox_command = "echo -e '\\n exit' | mbcmd"
+            self._execute_command(mailbox_command)
         self._check_processes()
         self.execute_commands("pre_validation")
 
@@ -342,6 +355,7 @@ class ServerManager:
     def shutdown(self):
         """Perform shutdown tasks."""
         logging.info("Starting shutdown...")
+        self._check_processes()
 
         if self.server_type == "switch_server" and self.client in ["client1", "client2"]:
             self._handle_producer_shutdown()
@@ -445,23 +459,23 @@ class ServerManager:
             if self.action == "prevalidation":
                 self.pre_validation()
                 logging.info("Pre-validation completed successfully.")
-                self.create_trigger_file(f"successful_prevalidation{TRIG_EXTENSION}")
+                self.create_trigger_file("successful_prevalidation.trig")
                 print("Pre-validation completed successfully.")
                 sys.exit(EXIT_SUCCESS)
             elif self.action == "shutdown":
                 self.shutdown()
                 logging.info("Shutdown completed successfully.")
-                self.create_trigger_file(f"successful_shutdown{TRIG_EXTENSION}")
+                self.create_trigger_file("successful_shutdown.trig")
                 print("Shutdown completed successfully.")
                 sys.exit(EXIT_SUCCESS)
             else:
                 logging.error(f"Unknown action: {self.action}")
-                self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+                self.create_trigger_file(f"{self.action}_failed.trig")
                 print(f"Unknown action: {self.action}", file=sys.stderr)
                 sys.exit(EXIT_UNKNOWN_ACTION)
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
-            self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+            self.create_trigger_file(f"{self.action}_failed.trig")
             print(f"Script execution stopped due to an error: {e}", file=sys.stderr)
             sys.exit(EXIT_GENERAL_FAILURE)
 
