@@ -27,6 +27,7 @@ def is_process_running(process_name):
 
 # Constants for log directory and file extensions
 LOG_DIR = "logs"
+TRIG_DIR = "trig_files"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
 TRIG_EXTENSION = ".trig"
@@ -163,6 +164,7 @@ class ServerManager:
         self.server_type = self.identify_server_type()
         self.action = action
         self.setup_logging()
+        self.create_trig_directory()
 
     def setup_logging(self):
         """Set up logging for the script."""
@@ -180,8 +182,7 @@ class ServerManager:
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
                 logging.FileHandler(self.log_filename),
-                logging.FileHandler(self.failed_log_filename),
-                logging.StreamHandler(sys.stdout)
+                logging.FileHandler(self.failed_log_filename)
             ]
         )
 
@@ -191,6 +192,17 @@ class ServerManager:
         for log_file in log_files:
             if os.path.exists(log_file):
                 os.remove(log_file)
+
+    def create_trig_directory(self):
+        """Create the trig file directory if it doesn't exist."""
+        os.makedirs(TRIG_DIR, exist_ok=True)
+
+    def create_trigger_file(self, filename):
+        """Create a zero-byte trigger file."""
+        trigger_file_path = os.path.join(TRIG_DIR, filename)
+        if os.path.exists(trigger_file_path):
+            os.remove(trigger_file_path)
+        open(trigger_file_path, 'a').close()
 
     def identify_client(self):
         """Identify the client based on the hostname."""
@@ -265,10 +277,6 @@ class ServerManager:
             if error_output:
                 logging.error(f"Error output:\n{error_output}")
 
-            if command == "echo -e '\n exit' | mbcmd":
-                filtered_output = self._filter_mbcmd_output(output)
-                logging.info(f"Filtered Output:\n{filtered_output}")
-
             if capture_output:
                 return output
 
@@ -279,19 +287,20 @@ class ServerManager:
             self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
             sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
-    def _check_mailbox_status(self):
-        """Check the mailbox status by executing mbcmd."""
-        command = "echo -e '\n exit' | mbcmd"
-        logging.info(f"Checking mailbox status with command: {command}")
-        output = self._execute_command(command, capture_output=True)
-        if "Mail box system not active" in output:
-            return "Mail box system not active"
-        return "Mail box system active"
+    def _filter_mbcmd_output(self, output):
+        """Filter the output of mbcmd to find relevant information."""
+        for line in output.splitlines():
+            if "Mail Box up since" in line:
+                return line
+            if "Mail box system not active" in line:
+                return line
+        return "Desired line not found in mbcmd output."
 
     def _handle_ipcs_output(self, output):
-        """Handle the output of the ipcs command and log or take action if needed."""
-        shared_memory_section = False
+        """Handle the output of the ipcs command to check for shared memory segments."""
         istadm_found = False
+
+        shared_memory_section = False
         for line in output.splitlines():
             if re.match(r'------\s*Shared Memory Segments\s*------', line):
                 shared_memory_section = True
@@ -309,11 +318,11 @@ class ServerManager:
             logging.error("Shared memory segments for istadm were found during shutdown.")
             sys.exit(EXIT_SHUTDOWN_FAILURE)
 
-    def create_trigger_file(self, filename):
-        """Create a trigger file to indicate success or failure."""
-        trigger_file_path = os.path.join(LOG_DIR, filename)
-        with open(trigger_file_path, 'w') as trigger_file:
-            trigger_file.write('')
+    def _check_mailbox_status(self):
+        """Check the mailbox status for switch_server or L7_server."""
+        command = "echo -e '\\n exit' | mbcmd"
+        output = self._execute_command(command, capture_output=True)
+        return self._filter_mbcmd_output(output)
 
     def pre_validation(self):
         """Perform pre-validation tasks."""
@@ -436,14 +445,14 @@ class ServerManager:
             if self.action == "prevalidation":
                 self.pre_validation()
                 logging.info("Pre-validation completed successfully.")
+                self.create_trigger_file(f"successful_prevalidation{TRIG_EXTENSION}")
                 print("Pre-validation completed successfully.")
-                self.create_trigger_file("prevalidation_successful.trig")
                 sys.exit(EXIT_SUCCESS)
             elif self.action == "shutdown":
                 self.shutdown()
                 logging.info("Shutdown completed successfully.")
+                self.create_trigger_file(f"successful_shutdown{TRIG_EXTENSION}")
                 print("Shutdown completed successfully.")
-                self.create_trigger_file("shutdown_successful.trig")
                 sys.exit(EXIT_SUCCESS)
             else:
                 logging.error(f"Unknown action: {self.action}")
@@ -452,8 +461,8 @@ class ServerManager:
                 sys.exit(EXIT_UNKNOWN_ACTION)
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
-            print(f"Script execution stopped due to an error: {e}", file=sys.stderr)
             self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+            print(f"Script execution stopped due to an error: {e}", file=sys.stderr)
             sys.exit(EXIT_GENERAL_FAILURE)
 
 def main():
