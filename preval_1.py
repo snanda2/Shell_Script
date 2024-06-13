@@ -29,6 +29,7 @@ def is_process_running(process_name):
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
+TRIGGER_FILE_DIR = "trigger_files"
 
 # Exit codes
 EXIT_SUCCESS = 0
@@ -162,6 +163,7 @@ class ServerManager:
         self.server_type = self.identify_server_type()
         self.action = action
         self.setup_logging()
+        self.create_trigger_file_dir()
 
     def setup_logging(self):
         """Set up logging for the script."""
@@ -191,18 +193,21 @@ class ServerManager:
         self.failed_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logging.getLogger().addHandler(self.failed_log_handler)
 
-        # Console handler for standard output
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(logging.Formatter('%(message)s'))
-        logging.getLogger().addHandler(console_handler)
-
     @staticmethod
     def _remove_old_log_files(*log_files):
         """Remove old log files if they exist."""
         for log_file in log_files:
             if os.path.exists(log_file):
                 os.remove(log_file)
+
+    def create_trigger_file_dir(self):
+        """Create the trigger file directory if it doesn't exist."""
+        os.makedirs(TRIGGER_FILE_DIR, exist_ok=True)
+
+    def create_trigger_file(self, filename):
+        """Create a zero-byte trigger file."""
+        trigger_file_path = os.path.join(TRIGGER_FILE_DIR, filename)
+        open(trigger_file_path, 'a').close()
 
     def identify_client(self):
         """Identify the client based on the hostname."""
@@ -235,6 +240,7 @@ class ServerManager:
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
             print("Unknown client or server type", file=sys.stderr)
+            self.create_trigger_file(f"failed_{self.action}.trig")
             sys.exit(EXIT_UNKNOWN_CLIENT_OR_SERVER)
 
         commands = COMMANDS[self.client][self.server_type].get(command_type, [])
@@ -263,14 +269,9 @@ class ServerManager:
             logging.info(f"Executed command: {command}")
             
             if command == "echo -e 'exit' | mbcmd":
-                filtered_output = self._filter_mbcmd_output(output)
-                logging.info(f"Output:\n{filtered_output}")
-                print(filtered_output)
-            elif command == "ipcs":
-                self._handle_ipcs_output(output)
-            else:
-                logging.info(f"Output:\n{output}")
-                print(output)
+                mailbox_line = self._filter_mbcmd_output(output)
+                logging.info(mailbox_line)
+            
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
@@ -443,17 +444,23 @@ class ServerManager:
             if self.action == "prevalidation":
                 self.pre_validation()
                 logging.info("Pre-validation completed successfully.")
+                self.create_trigger_file("successful_prevalidation.trig")
                 print("Pre-validation completed successfully.")
+                sys.exit(EXIT_SUCCESS)
             elif self.action == "shutdown":
                 self.shutdown()
                 logging.info("Shutdown completed successfully.")
+                self.create_trigger_file("successful_shutdown.trig")
                 print("Shutdown completed successfully.")
+                sys.exit(EXIT_SUCCESS)
             else:
                 logging.error(f"Unknown action: {self.action}")
+                self.create_trigger_file(f"failed_{self.action}.trig")
                 print(f"Unknown action: {self.action}", file=sys.stderr)
                 sys.exit(EXIT_UNKNOWN_ACTION)
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
+            self.create_trigger_file(f"failed_{self.action}.trig")
             print(f"Script execution stopped due to an error: {e}", file=sys.stderr)
             sys.exit(EXIT_GENERAL_FAILURE)
 
