@@ -230,6 +230,7 @@ class ServerManager:
             if "Mail box system not active" in mailbox_status:
                 logging.error("IST Mail box is not active. Exiting script.")
                 self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
+                print("IST Mail box is not active.")
                 sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
             logging.info("IST Mail box is up. Proceeding with commands.")
 
@@ -253,25 +254,36 @@ class ServerManager:
 
     def _execute_command(self, command, capture_output=False):
         """Execute a single command and log the result."""
+        logging.debug(f"Executing command: {command}")
         try:
             result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output = result.stdout.decode().strip()
+            error_output = result.stderr.decode().strip()
+
             logging.info(f"Executed command: {command}")
             logging.info(f"Output:\n{output}")
+            if error_output:
+                logging.error(f"Error output:\n{error_output}")
+
+            if command == "echo -e '\n exit' | mbcmd":
+                filtered_output = self._filter_mbcmd_output(output)
+                logging.info(f"Filtered Output:\n{filtered_output}")
+
             if capture_output:
                 return output
+
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to execute command: {command}")
             logging.error(f"Error:\n{error_output}")
-            self._log_to_failed_log(f"Command execution failed for: {command}\nError: {error_output}")
             self.create_trigger_file(f"{self.action}_failed{TRIG_EXTENSION}")
             sys.exit(EXIT_COMMAND_EXECUTION_FAILURE)
 
     def _check_mailbox_status(self):
-        """Check the mailbox status by executing mbcmd commands."""
-        mailbox_command = "echo -e '\n exit' | mbcmd"
-        output = self._execute_command(mailbox_command, capture_output=True)
+        """Check the mailbox status by executing mbcmd."""
+        command = "echo -e '\n exit' | mbcmd"
+        logging.info(f"Checking mailbox status with command: {command}")
+        output = self._execute_command(command, capture_output=True)
         if "Mail box system not active" in output:
             return "Mail box system not active"
         return "Mail box system active"
@@ -296,11 +308,6 @@ class ServerManager:
         else:
             logging.error("Shared memory segments for istadm were found during shutdown.")
             sys.exit(EXIT_SHUTDOWN_FAILURE)
-
-    def _log_to_failed_log(self, message):
-        """Log a message to the failed log file."""
-        with open(self.failed_log_filename, 'a') as failed_log_file:
-            failed_log_file.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {message}\n")
 
     def create_trigger_file(self, filename):
         """Create a trigger file to indicate success or failure."""
