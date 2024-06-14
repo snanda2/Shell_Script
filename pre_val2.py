@@ -220,7 +220,7 @@ class ServerManager:
                 return True
             elif "Mail box system not active" in output:
                 logging.error("IST Mail Box is not active.")
-                print("IST Mail Box is not active", file=sys.stderr)
+                print("IST Mail Box is not active. Exiting the script.", file=sys.stderr)
                 return False
             else:
                 logging.error("Unexpected mailbox status output.")
