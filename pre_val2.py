@@ -229,7 +229,7 @@ class ServerManager:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status.")
             logging.error(f"Error:\n{error_output}")
-            print(f"Error: {error_output}", file=sys.stderr)
+            print("IST Mail Box is not active. Exiting the script.", file=sys.stderr)
             return False
 
     def execute_commands(self, command_type):
