@@ -41,6 +41,7 @@ EXIT_SCRIPT_NOT_FOUND = 6
 EXIT_UNKNOWN_ACTION = 7
 EXIT_UNKNOWN_CLIENT_OR_SERVER = 8
 EXIT_MAILBOX_NOT_ACTIVE = 9
+EXIT_SHARED_MEMORY_SEGMENT_FOUND = 10
 
 # Server and client specific commands
 SERVER_SPECIFIC_COMMANDS = {
@@ -185,7 +186,7 @@ class ServerManager:
         # Failed log handler
         self.failed_log_handler = logging.FileHandler(self.failed_log_filename)
         self.failed_log_handler.setLevel(logging.ERROR)
-        self.failed_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        self.failed_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levellevelname)s - %(message)s'))
         logging.getLogger().addHandler(self.failed_log_handler)
 
     @staticmethod
@@ -233,7 +234,6 @@ class ServerManager:
                 return True
             elif "Mail box system not active" in output:
                 logging.error("IST Mail Box is not active.")
-                print("IST Mail Box is not active. Exiting the script.", file=sys.stderr)
                 self.overall_status = False
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
             else:
@@ -243,7 +243,6 @@ class ServerManager:
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
-            print("IST Mail Box is not active. Exiting the script.", file=sys.stderr)
             self.overall_status = False
             self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
 
@@ -251,15 +250,16 @@ class ServerManager:
         """Log the exit code and exit the script."""
         if exit_code == EXIT_SUCCESS:
             logging.info("Script completed successfully.")
+            print("Script completed successfully with exit code:", exit_code)
         else:
             logging.error(f"Script exiting with code: {exit_code}")
+            print("Script failed with exit code:", exit_code)
         sys.exit(exit_code)
 
     def execute_commands(self, command_type):
         """Execute the commands for the given command type (pre-validation or shutdown)."""
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
-            print("Unknown client or server type", file=sys.stderr)
             self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER)
 
         if self.server_type in ["switch_server", "L7_server"]:
@@ -315,7 +315,6 @@ class ServerManager:
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
             
             self.overall_status = False
-            print(f"Error: {error_output}", file=sys.stderr)
 
     def _execute_command_synchronously(self, command):
         """Execute a single command synchronously and return the output."""
@@ -375,8 +374,7 @@ class ServerManager:
             if shared_memory_section and "istadm" in line:
                 istadm_found = True
                 logging.error(f"Shared memory segment found for istadm: {line}")
-                print(f"Error: Shared memory segment found for istadm: {line}", file=sys.stderr)
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND)
 
         if not istadm_found:
             logging.info("No shared memory segments for istadm, shutdown is complete and clean.")
@@ -444,7 +442,7 @@ class ServerManager:
             self._execute_command(f"./{stop_script_path}")
         else:
             logging.error(f"Stop script {stop_script_path} not found.")
-            self.log_and_exit(EXIT_SCRIPT_NOT_FOUND)
+
 
     def _shutdown_wso2_server(self):
         """Shutdown wso2 server by executing wso2server.sh with stop argument."""
