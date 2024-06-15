@@ -29,6 +29,7 @@ def is_process_running(process_name):
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
+TRIGGER_FILE_DIR = "trigger_files"
 
 # Exit codes
 EXIT_SUCCESS = 0
@@ -180,7 +181,7 @@ class ServerManager:
         logging.basicConfig(
             filename=self.log_filename,
             level=logging.DEBUG,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(levellevelname)s - %(message)s'
         )
 
         # Failed log handler
@@ -235,24 +236,29 @@ class ServerManager:
             elif "Mail box system not active" in output:
                 logging.error("IST Mail Box is not active.")
                 self.overall_status = False
+                self.create_trigger_file(f"{self.action}_failed.trig")
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
             else:
                 logging.error("Unexpected mailbox status output.")
                 self.overall_status = False
+                self.create_trigger_file(f"{self.action}_failed.trig")
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
             self.overall_status = False
+            self.create_trigger_file(f"{self.action}_failed.trig")
             self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
 
     def log_and_exit(self, exit_code):
         """Log the exit code and exit the script."""
         if exit_code == EXIT_SUCCESS:
             logging.info("Script completed successfully.")
+            self.create_trigger_file(f"{self.action}_successful.trig")
             print("Script completed successfully with exit code:", exit_code)
         else:
             logging.error(f"Script exiting with code: {exit_code}")
+            self.create_trigger_file(f"{self.action}_failed.trig")
             print("Script failed with exit code:", exit_code)
         sys.exit(exit_code)
 
@@ -374,6 +380,7 @@ class ServerManager:
             if shared_memory_section and "istadm" in line:
                 istadm_found = True
                 logging.error(f"Shared memory segment found for istadm: {line}")
+                self.create_trigger_file(f"{self.action}_failed.trig")
                 self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND)
 
         if not istadm_found:
@@ -442,7 +449,7 @@ class ServerManager:
             self._execute_command(f"./{stop_script_path}")
         else:
             logging.error(f"Stop script {stop_script_path} not found.")
-
+            # No need to exit or mark overall status as false
 
     def _shutdown_wso2_server(self):
         """Shutdown wso2 server by executing wso2server.sh with stop argument."""
@@ -481,6 +488,18 @@ class ServerManager:
             logging.error(f"killme script not found at {killme_script_path}.")
             self.log_and_exit(EXIT_SCRIPT_NOT_FOUND)
 
+    def create_trigger_file(self, filename):
+        """Create a trigger file in the trigger directory."""
+        os.makedirs(TRIGGER_FILE_DIR, exist_ok=True)
+        trigger_file_path = os.path.join(TRIGGER_FILE_DIR, filename)
+
+        # Remove old trigger files
+        for file in os.listdir(TRIGGER_FILE_DIR):
+            os.remove(os.path.join(TRIGGER_FILE_DIR, file))
+
+        with open(trigger_file_path, 'w') as file:
+            pass
+
     def run(self):
         """Run the specified action (pre-validation or shutdown)."""
         logging.info(f"Hostname: {self.hostname}")
@@ -502,9 +521,11 @@ class ServerManager:
         # Log the overall status of the script
         if self.overall_status:
             logging.info("Script completed successfully.")
+            self.create_trigger_file(f"{self.action}_successful.trig")
             self.log_and_exit(EXIT_SUCCESS)
         else:
             logging.error("Script completed with errors.")
+            self.create_trigger_file(f"{self.action}_failed.trig")
             self.log_and_exit(EXIT_GENERAL_FAILURE)
 
 def main():
