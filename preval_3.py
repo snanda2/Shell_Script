@@ -1,5 +1,34 @@
 #!/usr/bin/env python3
 
+"""
+Auto Patching Script
+
+This script performs pre-validation and shutdown tasks for various server types based on the client configuration.
+
+Author: [Your Name]
+Date: [Date]
+
+Usage:
+    python script_name.py <action>
+
+    action:
+        prevalidation   Perform pre-validation tasks.
+        shutdown        Perform shutdown tasks.
+
+Exit Codes:
+    EXIT_SUCCESS = 0
+    EXIT_GENERAL_FAILURE = 1
+    EXIT_PREVALIDATION_FAILURE = 2
+    EXIT_SHUTDOWN_FAILURE = 3
+    EXIT_COMMAND_EXECUTION_FAILURE = 4
+    EXIT_PROCESS_NOT_FOUND = 5
+    EXIT_SCRIPT_NOT_FOUND = 6
+    EXIT_UNKNOWN_ACTION = 7
+    EXIT_UNKNOWN_CLIENT_OR_SERVER = 8
+    EXIT_MAILBOX_NOT_ACTIVE = 9
+    EXIT_SHARED_MEMORY_SEGMENT_FOUND = 10
+"""
+
 import os
 import socket
 import subprocess
@@ -181,7 +210,7 @@ class ServerManager:
         logging.basicConfig(
             filename=self.log_filename,
             level=logging.DEBUG,
-            format='%(asctime)s - %(levellevelname)s - %(message)s'
+            format='%(asctime)s - %(levelname)s - %(message)s'
         )
 
         # Failed log handler
@@ -234,21 +263,13 @@ class ServerManager:
                 logging.info("IST Mail Box is up and active.")
                 return True
             elif "Mail box system not active" in output:
-                logging.error("IST Mail Box is not active.")
-                self.overall_status = False
-                self.create_trigger_file(f"{self.action}_failed.trig")
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
-                logging.error("Unexpected mailbox status output.")
-                self.overall_status = False
-                self.create_trigger_file(f"{self.action}_failed.trig")
-                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
+                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Unexpected mailbox status output")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
-            self.overall_status = False
-            self.create_trigger_file(f"{self.action}_failed.trig")
-            self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
+            self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Failed to check mailbox status")
 
     def log_and_exit(self, exit_code, message=""):
         """Log the exit code and exit the script."""
@@ -258,7 +279,8 @@ class ServerManager:
             self.create_trigger_file(f"{self.action}_successful.trig")
             print(f"{script_name} completed successfully with exit code: {exit_code}")
         else:
-            logging.error(f"Script exiting with code: {exit_code}")
+            logging.error(f"{script_name} Failed: {message}")
+            logging.error(f"{script_name} Failed with exit code: {exit_code}")
             self.create_trigger_file(f"{self.action}_failed.trig")
             print(f"{script_name} Failed: {message}")
             print(f"{script_name} Failed with exit code: {exit_code}")
@@ -267,7 +289,6 @@ class ServerManager:
     def execute_commands(self, command_type):
         """Execute the commands for the given command type (pre-validation or shutdown)."""
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
-            logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
             self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER, "Unknown client or server type")
 
         if self.server_type in ["switch_server", "L7_server"]:
@@ -313,13 +334,10 @@ class ServerManager:
             logging.error(f"Status code: {status_code}")
 
             if status_code == 127:
-                logging.error("Command not found.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
             elif status_code == 126:
-                logging.error("Command cannot execute.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
             elif status_code == 1:
-                logging.error("General error.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
             
             self.overall_status = False
@@ -348,13 +366,10 @@ class ServerManager:
             logging.error(f"Status code: {status_code}")
 
             if status_code == 127:
-                logging.error("Command not found.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
             elif status_code == 126:
-                logging.error("Command cannot execute.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
             elif status_code == 1:
-                logging.error("General error.")
                 self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
 
             self.overall_status = False
@@ -382,7 +397,6 @@ class ServerManager:
             if shared_memory_section and "istadm" in line:
                 istadm_found = True
                 logging.error(f"Shared memory segment found for istadm: {line}")
-                self.create_trigger_file(f"{self.action}_failed.trig")
                 self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND, "Shared memory segment found for istadm")
 
         if not istadm_found:
@@ -514,7 +528,6 @@ class ServerManager:
             elif self.action == "shutdown":
                 self.shutdown()
             else:
-                logging.error(f"Unknown action: {self.action}")
                 self.log_and_exit(EXIT_UNKNOWN_ACTION, "Unknown action")
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
