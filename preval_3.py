@@ -237,36 +237,38 @@ class ServerManager:
                 logging.error("IST Mail Box is not active.")
                 self.overall_status = False
                 self.create_trigger_file(f"{self.action}_failed.trig")
-                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
+                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
                 logging.error("Unexpected mailbox status output.")
                 self.overall_status = False
                 self.create_trigger_file(f"{self.action}_failed.trig")
-                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
+                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
             self.overall_status = False
             self.create_trigger_file(f"{self.action}_failed.trig")
-            self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE)
+            self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
 
-    def log_and_exit(self, exit_code):
+    def log_and_exit(self, exit_code, message=""):
         """Log the exit code and exit the script."""
+        script_name = os.path.basename(__file__)
         if exit_code == EXIT_SUCCESS:
             logging.info("Script completed successfully.")
             self.create_trigger_file(f"{self.action}_successful.trig")
-            print("Script completed successfully with exit code:", exit_code)
+            print(f"{script_name} completed successfully with exit code: {exit_code}")
         else:
             logging.error(f"Script exiting with code: {exit_code}")
             self.create_trigger_file(f"{self.action}_failed.trig")
-            print("Script failed with exit code:", exit_code)
+            print(f"{script_name} Failed: {message}")
+            print(f"{script_name} Failed with exit code: {exit_code}")
         sys.exit(exit_code)
 
     def execute_commands(self, command_type):
         """Execute the commands for the given command type (pre-validation or shutdown)."""
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             logging.error(f"Unknown client ({self.client}) or server type ({self.server_type})")
-            self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER)
+            self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER, "Unknown client or server type")
 
         if self.server_type in ["switch_server", "L7_server"]:
             if not self.check_mailbox_status():
@@ -312,13 +314,13 @@ class ServerManager:
 
             if status_code == 127:
                 logging.error("Command not found.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
             elif status_code == 126:
                 logging.error("Command cannot execute.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
             elif status_code == 1:
                 logging.error("General error.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
             
             self.overall_status = False
 
@@ -347,13 +349,13 @@ class ServerManager:
 
             if status_code == 127:
                 logging.error("Command not found.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
             elif status_code == 126:
                 logging.error("Command cannot execute.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
             elif status_code == 1:
                 logging.error("General error.")
-                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE)
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
 
             self.overall_status = False
             return None
@@ -381,7 +383,7 @@ class ServerManager:
                 istadm_found = True
                 logging.error(f"Shared memory segment found for istadm: {line}")
                 self.create_trigger_file(f"{self.action}_failed.trig")
-                self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND)
+                self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND, "Shared memory segment found for istadm")
 
         if not istadm_found:
             logging.info("No shared memory segments for istadm, shutdown is complete and clean.")
@@ -459,7 +461,7 @@ class ServerManager:
             self._execute_command(f"{wso2_script_path} stop")
         else:
             logging.error(f"WSO2 server shutdown script {wso2_script_path} not found.")
-            self.log_and_exit(EXIT_SCRIPT_NOT_FOUND)
+            self.log_and_exit(EXIT_SCRIPT_NOT_FOUND, "WSO2 server shutdown script not found")
 
     def _handle_ist_api_services_shutdown(self):
         """Handle shutdown of ist-api-services for L7 server."""
@@ -486,7 +488,7 @@ class ServerManager:
             self._execute_command(f"./{killme_script_path}")
         else:
             logging.error(f"killme script not found at {killme_script_path}.")
-            self.log_and_exit(EXIT_SCRIPT_NOT_FOUND)
+            self.log_and_exit(EXIT_SCRIPT_NOT_FOUND, "killme script not found")
 
     def create_trigger_file(self, filename):
         """Create a trigger file in the trigger directory."""
@@ -513,10 +515,10 @@ class ServerManager:
                 self.shutdown()
             else:
                 logging.error(f"Unknown action: {self.action}")
-                self.log_and_exit(EXIT_UNKNOWN_ACTION)
+                self.log_and_exit(EXIT_UNKNOWN_ACTION, "Unknown action")
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
-            self.log_and_exit(EXIT_GENERAL_FAILURE)
+            self.log_and_exit(EXIT_GENERAL_FAILURE, "General failure")
 
         # Log the overall status of the script
         if self.overall_status:
@@ -526,7 +528,7 @@ class ServerManager:
         else:
             logging.error("Script completed with errors.")
             self.create_trigger_file(f"{self.action}_failed.trig")
-            self.log_and_exit(EXIT_GENERAL_FAILURE)
+            self.log_and_exit(EXIT_GENERAL_FAILURE, "Script completed with errors")
 
 def main():
     """Main entry point for the script."""
