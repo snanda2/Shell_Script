@@ -277,7 +277,7 @@ for project_key in project_keys:
         attachments.append(html_filename)
         print(f"HTML file '{html_filename}' created successfully.")
 
-# Create email body with hyperlinks
+# Create email body with instructions to open attachments
 email_body = """
 <html>
 <head>
@@ -289,20 +289,21 @@ email_body = """
 </head>
 <body>
     <p>Hi Team,</p>
-    <p>Please find below the open issues for the respective projects:</p>
+    <p>Please find attached the open issues for the respective projects:</p>
     <ul>
 """
 
-# Add hyperlinks to the email body
+# Add instructions to open attachments in the email body
 for project_key in project_keys:
-    email_body += f'<li><a href="open_issues_{project_key}.html" target="_blank">Open Issues for {project_key}</a></li>'
+    email_body += f'<li><a href="cid:open_issues_{project_key}.html">Open Issues for {project_key}</a></li>'
 
 email_body += """
     </ul>
     <p>NOTE: This is an automated email. In case of any concerns please reach out to us at <a href="mailto:abc@gmail.com">abc@gmail.com</a>.</p>
+    <p>Please download and open the attached HTML files to view the details.</p>
 </body>
 </html>
 """
 
-# Send email with HTML content
+# Send email with HTML content and attachments
 send_email(sender_email, receiver_email, subject, email_body, attachments)
