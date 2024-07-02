@@ -10,6 +10,7 @@ import psutil
 import sys
 import time
 import re
+import json
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -34,7 +35,7 @@ def is_process_running(process_name):
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
-TRIGGER_FILE_DIR = "trigger_files"
+PRE_VALIDATION_STATE_FILE = "prevalidation_state.json"
 
 # Email Configuration
 SMTP_SERVER = "smtp.example.com"
@@ -199,6 +200,9 @@ class ServerManager:
         self.action = action
         self.setup_logging()
         self.overall_status = True  # To track overall script status
+        self.prevalidation_state = {
+            "processes": []
+        }
 
     def setup_logging(self):
         """Set up logging for the script."""
@@ -256,9 +260,9 @@ class ServerManager:
 
     def identify_environment(self):
         """Identify the environment based on the hostname."""
-        environment = re.search(r'v\w\w\w(\w)', self.hostname.lower())
-        if environment:
-            env_code = environment.group(1)
+        match = re.search(r'v\w{2}\w{4}(\w{1})\w{2}', self.hostname.lower())
+        if match:
+            env_code = match.group(1)
             if env_code == 'p':
                 return "Production"
             elif env_code == 's':
@@ -271,9 +275,9 @@ class ServerManager:
 
     def identify_region(self):
         """Identify the region based on the hostname."""
-        region = re.search(r'v\w\w(\w)', self.hostname.lower())
-        if region:
-            region_code = region.group(1)
+        match = re.search(r'v\w{2}\w{3}(\w{1})\w{2}', self.hostname.lower())
+        if match:
+            region_code = match.group(1)
             if region_code == 'w':
                 return "West"
             elif region_code == 'e':
@@ -316,12 +320,10 @@ class ServerManager:
 
         if exit_code == EXIT_SUCCESS:
             logging.info(status_description)
-            self.create_trigger_file(f"{self.action}_successful.trig")
             print(f"{script_name} completed successfully with exit code: {exit_code}")
         else:
             logging.error(f"{script_name} Failed: {message}")
             logging.error(f"{script_name} Failed with exit code: {exit_code}")
-            self.create_trigger_file(f"{self.action}_failed.trig")
             print(f"{script_name} Failed: {message}")
             print(f"{script_name} Failed with exit code: {exit_code}")
 
@@ -332,7 +334,7 @@ class ServerManager:
         """Send an email notification with the log file attached."""
         script_name = os.path.basename(__file__)
         current_time = datetime.now().strftime("%d-%m-%Y %H:%M")
-        subject = f"{self.action.capitalize()} Notification - {self.client} {self.environment} {self.region} - {self.hostname} - {current_time}"
+        subject = f"{script_name} {self.action.capitalize()} Notification - {self.client} {self.environment} {self.region} - {self.hostname} - {current_time}"
         body = f"Script Name: {script_name}\n"
         body += f"Hostname: {self.hostname}\n"
         body += f"Client: {self.client}\n"
@@ -539,6 +541,7 @@ class ServerManager:
         logging.info("Starting pre-validation...")
         self._check_processes()
         self.execute_commands("pre_validation")
+        self.save_prevalidation_state()
 
     def _check_processes(self):
         """Check the status of required processes and log the results."""
@@ -546,8 +549,19 @@ class ServerManager:
         for process in processes:
             if is_process_running(process):
                 logging.info(f"Process {process} is running")
+                self.prevalidation_state["processes"].append(process)
             else:
                 logging.warning(f"Process {process} is not running")
+
+    def save_prevalidation_state(self):
+        """Save the pre-validation state to a file."""
+        try:
+            with open(PRE_VALIDATION_STATE_FILE, 'w') as f:
+                json.dump(self.prevalidation_state, f)
+            logging.info("Pre-validation state saved successfully.")
+        except Exception as e:
+            logging.error(f"Failed to save pre-validation state. Error: {e}")
+            self.log_and_exit(EXIT_GENERAL_FAILURE, "Failed to save pre-validation state")
 
     def shutdown(self):
         """Perform shutdown tasks."""
@@ -633,18 +647,6 @@ class ServerManager:
             logging.error(f"killme script not found at {killme_script_path}.")
             self.log_and_exit(EXIT_SCRIPT_NOT_FOUND, "killme script not found")
 
-    def create_trigger_file(self, filename):
-        """Create a trigger file in the trigger directory."""
-        os.makedirs(TRIGGER_FILE_DIR, exist_ok=True)
-        trigger_file_path = os.path.join(TRIGGER_FILE_DIR, filename)
-
-        # Remove old trigger files
-        for file in os.listdir(TRIGGER_FILE_DIR):
-            os.remove(os.path.join(TRIGGER_FILE_DIR, file))
-
-        with open(trigger_file_path, 'w') as file:
-            pass
-
     def run(self):
         """Run the specified action (pre-validation or shutdown)."""
         logging.info(f"Hostname: {self.hostname}")
@@ -667,11 +669,9 @@ class ServerManager:
         # Log the overall status of the script
         if self.overall_status:
             logging.info("Script completed successfully.")
-            self.create_trigger_file(f"{self.action}_successful.trig")
             self.log_and_exit(EXIT_SUCCESS)
         else:
             logging.error("Script completed with errors.")
-            self.create_trigger_file(f"{self.action}_failed.trig")
             self.log_and_exit(EXIT_GENERAL_FAILURE, "Script completed with errors")
 
 def main():
