@@ -55,10 +55,21 @@ def print_response_fields(response_parts):
 
     total_out_messages = len(response_parts)
 
-    for response_code, message_dict in response_dict.items():
-        for (response_message, host_response_code, actual_response_code), count in message_dict.items():
+    sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
+
+    sorted_entries = []
+    for response_code in sorted_response_codes:
+        message_dict = response_dict[response_code]
+        for key, count in message_dict.items():
+            response_message, host_response_code, actual_response_code = key
             percentage = (count / total_out_messages) * 100
-            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
+            sorted_entries.append((response_code, response_message, host_response_code, actual_response_code, percentage, count))
+
+    sorted_entries.sort(key=lambda x: x[5], reverse=True)
+
+    for entry in sorted_entries:
+        response_code, response_message, host_response_code, actual_response_code, percentage, count = entry
+        print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -210,15 +221,18 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
 
     if in_message_count > total_out_messages:
         dropped_message_percentage = ((in_message_count - total_out_messages) / in_message_count) * 100
-        print(f"Dropped MESSAGE Percentage: {dropped_message_percentage:.2f}%")
+        if dropped_message_percentage > 0:
+            print(f"Dropped MESSAGE Percentage: {dropped_message_percentage:.2f}%")
 
-    print(f"Total No. of OUT_MESSAGE that contains certificate: {total_out_messages_with_certificate}")
-    print_response_fields(response_parts)
+    if total_out_messages_with_certificate > 0:
+        print(f"Total No. of OUT_MESSAGE that contains certificate: {total_out_messages_with_certificate}")
 
     if overall_earliest_time:
         print(f"\nStart Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
     if overall_latest_time:
         print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    print_response_fields(response_parts)
 
     end_time_total = time.time()
     elapsed_time_total = end_time_total - start_time_total
