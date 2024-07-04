@@ -1,10 +1,18 @@
 import os
 import json
 import re
+import tarfile
+import argparse
 from collections import Counter
 import time
 import socket
 from datetime import datetime
+
+# Define path variables
+LOG_DIRECTORY_TODAY = '/data/wso2/wso2am-3.2.0/repository/logs'
+BACKUP_DIRECTORY_TEMPLATE = '/ist-shared/backup/{}/backup_wso2'
+ARCHIVE_FILE_NAME = 'bkd_archive.tgz'
+EXTRACTED_DIR_NAME = 'extracted'
 
 def is_valid_date(date):
     try:
@@ -28,21 +36,6 @@ def extract_time(log_line):
         if time_only:
             return time_only.group(1)
     return None
-
-def extract_records_in_time_range(file_path, target_date, start_time, end_time):
-    start_datetime = datetime.strptime(f"{target_date} {start_time}", "%Y-%m-%d %H:%M:%S")
-    end_datetime = datetime.strptime(f"{target_date} {end_time}", "%Y-%m-%d %H:%M:%S")
-
-    matching_lines = []
-    with open(file_path, 'r', errors='replace') as file:
-        for line_number, line in enumerate(file, start=1):
-            log_time = extract_time(line)
-            if log_time:
-                log_datetime = datetime.strptime(f"{target_date} {log_time}", "%Y-%m-%d %H:%M:%S")
-                if start_datetime <= log_datetime <= end_datetime:
-                    matching_lines.append(f"{line.strip()}")
-
-    return matching_lines
 
 def print_response_fields(response_parts):
     print("\nResponse Code\tResponse Message\tHost Response Code\tActual Response Code\t\tPercentage\tTotal Count")
@@ -92,7 +85,63 @@ def process_combined_line(line, response_parts, total_out_messages_with_certific
                     total_out_messages_with_certificate += 1
                     unique_response_codes.add(response_part.get('responseCode', '0'))
 
-def process_log_files(directory_path, date, start_time=None, end_time=None):
+def process_log_file(file_path, date, response_parts, total_out_messages_with_certificate, unique_response_codes, start_time=None, end_time=None):
+    in_message_count = 0
+    total_out_messages = 0
+
+    try:
+        with open(file_path, 'r', errors='replace') as file:
+            for line in file:
+                log_time = extract_time(line)
+                if start_time and end_time and log_time:
+                    log_datetime = datetime.strptime(f"{date} {log_time}", "%Y-%m-%d %H:%M:%S")
+                    start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M:%S")
+                    end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M:%S")
+                    if not (start_datetime <= log_datetime <= end_datetime):
+                        continue
+
+                if 'IN_MESSAGE' in line:
+                    in_message_count += 1
+                elif 'OUT_MESSAGE' in line and '--- Response ---' in line:
+                    total_out_messages += 1
+                    response_part = print_after_response(line)
+                    if response_part is not None:
+                        if "certificate" not in line:
+                            response_parts.append(response_part)
+                        else:
+                            total_out_messages_with_certificate += 1
+                            unique_response_codes.add(response_part.get('responseCode', '0'))
+                elif 'TXN = OUT_MESSAGE' in line:
+                    process_combined_line(line, response_parts, total_out_messages_with_certificate, unique_response_codes)
+
+    except FileNotFoundError:
+        print(f"Error: File not found at path {file_path}")
+    except Exception as e:
+        print(f"Error reading the file: {e}")
+
+    return in_message_count, total_out_messages
+
+def extract_tar_file(tar_path, extract_to):
+    try:
+        with tarfile.open(tar_path, 'r:gz') as tar:
+            tar.extractall(path=extract_to)
+    except Exception as e:
+        print(f"Error extracting tar file {tar_path}: {e}")
+
+def find_log_files_in_archives(archive_dir, date, log_files):
+    for archive_folder in os.listdir(archive_dir):
+        if archive_folder.startswith(f'archive-{date.replace("-", "")}'):
+            folder_path = os.path.join(archive_dir, archive_folder)
+            tar_file_path = os.path.join(folder_path, ARCHIVE_FILE_NAME)
+            if os.path.exists(tar_file_path):
+                extract_to = os.path.join(folder_path, EXTRACTED_DIR_NAME)
+                os.makedirs(extract_to, exist_ok=True)
+                extract_tar_file(tar_file_path, extract_to)
+                for log_file in os.listdir(extract_to):
+                    if log_file.startswith(f'wso2carbon-{date}'):
+                        log_files.append(os.path.join(extract_to, log_file))
+
+def process_log_files(date, original_hostname, start_time=None, end_time=None):
     if not is_valid_date(date):
         print("Invalid date entered. Exiting.")
         return
@@ -101,45 +150,42 @@ def process_log_files(directory_path, date, start_time=None, end_time=None):
         return
 
     start_time_total = time.time()
-    in_message_count = 0
     response_parts = []
-    total_out_messages = 0
     total_out_messages_with_certificate = 0
     unique_response_codes = set()
 
-    for filename in os.listdir(directory_path):
-        if filename.startswith(f'wso2carbon-{date}') and filename.endswith('.log'):
-            file_path = os.path.join(directory_path, filename)
+    in_message_count = 0
+    total_out_messages = 0
 
-            try:
-                with open(file_path, 'r', errors='replace') as file:
-                    for line in file:
-                        log_time = extract_time(line)
-                        if start_time and end_time and log_time:
-                            log_datetime = datetime.strptime(f"{date} {log_time}", "%Y-%m-%d %H:%M:%S")
-                            start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M:%S")
-                            end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M:%S")
-                            if not (start_datetime <= log_datetime <= end_datetime):
-                                continue
+    if datetime.strptime(date, '%Y-%m-%d').date() == datetime.now().date():
+        log_files = [os.path.join(LOG_DIRECTORY_TODAY, 'wso2carbon.log')]
+    else:
+        backup_directories = [
+            BACKUP_DIRECTORY_TEMPLATE.format(original_hostname),
+            BACKUP_DIRECTORY_TEMPLATE.format(get_alternate_hostname(original_hostname))
+        ]
+        date_str = date.replace('-', '')
+        log_files = []
 
-                        if 'IN_MESSAGE' in line:
-                            in_message_count += 1
-                        elif 'OUT_MESSAGE' in line and '--- Response ---' in line:
-                            total_out_messages += 1
-                            response_part = print_after_response(line)
-                            if response_part is not None:
-                                if "certificate" not in line:
-                                    response_parts.append(response_part)
-                                else:
-                                    total_out_messages_with_certificate += 1
-                                    unique_response_codes.add(response_part.get('responseCode', '0'))
-                        elif 'TXN = OUT_MESSAGE' in line:
-                            process_combined_line(line, response_parts, total_out_messages_with_certificate, unique_response_codes)
+        # Check backup directories first
+        for backup_directory in backup_directories:
+            if os.path.exists(backup_directory):
+                for backup_folder in os.listdir(backup_directory):
+                    if backup_folder.startswith(f'backup-{date_str}'):
+                        folder_path = os.path.join(backup_directory, backup_folder)
+                        for log_file in os.listdir(folder_path):
+                            if log_file.startswith(f'wso2carbon-{date}'):
+                                log_files.append(os.path.join(folder_path, log_file))
 
-            except FileNotFoundError:
-                print(f"Error: File not found at path {file_path}")
-            except Exception as e:
-                print(f"Error reading the file: {e}")
+        # If no log files found in backup directories, check archive directories
+        if not log_files:
+            for archive_directory in backup_directories:
+                find_log_files_in_archives(archive_directory, date, log_files)
+
+    for log_file in log_files:
+        inc, out = process_log_file(log_file, date, response_parts, total_out_messages_with_certificate, unique_response_codes, start_time, end_time)
+        in_message_count += inc
+        total_out_messages += out
 
     hostname = socket.gethostname()
     print(f"\nExecuting on hostname: {hostname}")
@@ -158,14 +204,45 @@ def process_log_files(directory_path, date, start_time=None, end_time=None):
     script_name = os.path.basename(__file__)
     print(f"\nScript '{script_name}' completed in {elapsed_time_total:.2f} seconds.")
 
-# Directory path and date input
-directory_path = '/home/sukumar/temp'
-date = input("Enter the date (in the format YYYY-MM-DD): ")
+def get_alternate_hostname(hostname):
+    if hostname.endswith('01'):
+        return hostname[:-2] + '02'
+    elif hostname.endswith('02'):
+        return hostname[:-2] + '01'
+    else:
+        raise ValueError("Hostname does not end in '01' or '02'")
 
-use_time_range = input("Do you want to specify a time range? (yes/no): ").lower()
-if use_time_range == 'yes':
-    start_time = input("Enter the start time (HH:MM:SS): ")
-    end_time = input("Enter the end time (HH:MM:SS): ")
-    process_log_files(directory_path, date, start_time, end_time)
-else:
-    process_log_files(directory_path, date)
+def main():
+    parser = argparse.ArgumentParser(description="Process log files for WSO2.")
+    parser.add_argument('-d', '--date', type=str, help="Specify the date (format: YYYY-MM-DD).")
+    parser.add_argument('-t', '--time', nargs=2, metavar=('START_TIME', 'END_TIME'), help="Specify the start and end times (format: HH:MM:SS).")
+    
+    args = parser.parse_args()
+    original_hostname = socket.gethostname()
+
+    if args.date:
+        if not is_valid_date(args.date):
+            print("Invalid date format. Please use YYYY-MM-DD.")
+            return
+        if datetime.strptime(args.date, '%Y-%m-%d').date() > datetime.now().date():
+            print("Future date entered. Exiting.")
+            return
+
+        if args.time:
+            if not (is_valid_time(args.time[0]) and is_valid_time(args.time[1])):
+                print("Invalid time format. Please use HH:MM:SS.")
+                return
+            process_log_files(args.date, original_hostname, args.time[0], args.time[1])
+        else:
+            process_log_files(args.date, original_hostname)
+    else:
+        if args.time:
+            if not (is_valid_time(args.time[0]) and is_valid_time(args.time[1])):
+                print("Invalid time format. Please use HH:MM:SS.")
+                return
+            process_log_files(datetime.now().strftime('%Y-%m-%d'), original_hostname, args.time[0], args.time[1])
+        else:
+            process_log_files(datetime.now().strftime('%Y-%m-%d'), original_hostname)
+
+if __name__ == "__main__":
+    main()
