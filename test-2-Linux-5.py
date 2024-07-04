@@ -53,12 +53,15 @@ def print_response_fields(response_parts):
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
+    print(f"Total OUT_MESSAGES: {total_out_messages}")
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
+    print(f"Sorted Response Codes: {sorted_response_codes}")
 
     for response_code in sorted_response_codes:
         message_dict = response_dict[response_code]
         sorted_entries = sorted(message_dict.items(), key=lambda item: item[1], reverse=True)
+        print(f"Sorted Entries for {response_code}: {sorted_entries}")
         for key, count in sorted_entries:
             response_message, host_response_code, actual_response_code = key
             percentage = (count / total_out_messages) * 100
