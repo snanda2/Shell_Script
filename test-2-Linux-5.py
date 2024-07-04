@@ -2,8 +2,7 @@ import os
 import json
 import re
 import tarfile
-import argparse
-from collections import Counter
+from collections import defaultdict, Counter
 import time
 import socket
 from datetime import datetime
@@ -40,23 +39,27 @@ def extract_time(log_line):
 def print_response_fields(response_parts):
     print("\nResponse Code\tResponse Message\tHost Response Code\tActual Response Code\t\tPercentage\tTotal Count")
 
-    response_parts.sort(key=lambda x: int(x.get('responseCode', 0)) if isinstance(x.get('responseCode'), (int, str)) and str(x.get('responseCode')).isdigit() else 0)
-    total_counts = Counter(str(part.get('responseCode', 'NA')) for part in response_parts)
+    response_dict = defaultdict(list)
+    total_counts = Counter()
+
+    for part in response_parts:
+        response_code = str(part.get('responseCode', 'NA'))
+        response_message = "Msg/Txn Id is Mandatory" if response_code == "4000001" else str(part.get('responseMessage', ''))
+        host_response_code = str(part.get('hostResponseCode', 'NA'))
+        actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA')
+        actual_response_code = actual_response_code if actual_response_code.strip() else 'NA'
+
+        response_dict[response_code].append((response_message, host_response_code, actual_response_code))
+        total_counts[response_code] += 1
+
     total_out_messages = len(response_parts)
 
-    for response_code, count in total_counts.items():
-        try:
-            response_part = next(part for part in response_parts if str(part.get('responseCode', 'NA')) == response_code)
-            response_message = "Msg/Txn Id is Mandatory" if response_code == "4000001" else str(response_part.get('responseMessage', ''))
-            host_response_code = str(response_part.get('hostResponseCode', 'NA'))
-            actual_response_code = response_part.get('additionalResponseData', {}).get('actualResponseCode', 'NA')
-            actual_response_code = actual_response_code if actual_response_code.strip() else 'NA'
+    for response_code, entries in response_dict.items():
+        for entry in entries:
+            response_message, host_response_code, actual_response_code = entry
+            percentage = (total_counts[response_code] / total_out_messages) * 100
 
-            percentage = (count / total_out_messages) * 100
-
-            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
-        except StopIteration:
-            print(f"Error: No response part found for response code {response_code}")
+            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{total_counts[response_code]}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -88,17 +91,25 @@ def process_combined_line(line, response_parts, total_out_messages_with_certific
 def process_log_file(file_path, date, response_parts, total_out_messages_with_certificate, unique_response_codes, start_time=None, end_time=None):
     in_message_count = 0
     total_out_messages = 0
+    earliest_time = None
+    latest_time = None
 
     try:
         with open(file_path, 'r', errors='replace') as file:
             for line in file:
                 log_time = extract_time(line)
-                if start_time and end_time and log_time:
+                if log_time:
                     log_datetime = datetime.strptime(f"{date} {log_time}", "%Y-%m-%d %H:%M:%S")
-                    start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M:%S")
-                    end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M:%S")
-                    if not (start_datetime <= log_datetime <= end_datetime):
-                        continue
+                    if earliest_time is None or log_datetime < earliest_time:
+                        earliest_time = log_datetime
+                    if latest_time is None or log_datetime > latest_time:
+                        latest_time = log_datetime
+
+                    if start_time and end_time:
+                        start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M:%S")
+                        end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M:%S")
+                        if not (start_datetime <= log_datetime <= end_datetime):
+                            continue
 
                 if 'IN_MESSAGE' in line:
                     in_message_count += 1
@@ -119,7 +130,7 @@ def process_log_file(file_path, date, response_parts, total_out_messages_with_ce
     except Exception as e:
         print(f"Error reading the file: {e}")
 
-    return in_message_count, total_out_messages
+    return in_message_count, total_out_messages, earliest_time, latest_time
 
 def extract_tar_file(tar_path, extract_to):
     try:
@@ -156,6 +167,8 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
 
     in_message_count = 0
     total_out_messages = 0
+    overall_earliest_time = None
+    overall_latest_time = None
 
     if datetime.strptime(date, '%Y-%m-%d').date() == datetime.now().date():
         log_files = [os.path.join(LOG_DIRECTORY_TODAY, 'wso2carbon.log')]
@@ -183,9 +196,13 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
                 find_log_files_in_archives(archive_directory, date, log_files)
 
     for log_file in log_files:
-        inc, out = process_log_file(log_file, date, response_parts, total_out_messages_with_certificate, unique_response_codes, start_time, end_time)
+        inc, out, earliest_time, latest_time = process_log_file(log_file, date, response_parts, total_out_messages_with_certificate, unique_response_codes, start_time, end_time)
         in_message_count += inc
         total_out_messages += out
+        if earliest_time and (overall_earliest_time is None or earliest_time < overall_earliest_time):
+            overall_earliest_time = earliest_time
+        if latest_time and (overall_latest_time is None or latest_time > overall_latest_time):
+            overall_latest_time = latest_time
 
     hostname = socket.gethostname()
     print(f"\nExecuting on hostname: {hostname}")
@@ -198,6 +215,11 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
 
     print(f"Total No. of OUT_MESSAGE that contains certificate: {total_out_messages_with_certificate}")
     print_response_fields(response_parts)
+
+    if overall_earliest_time:
+        print(f"\nStart Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if overall_latest_time:
+        print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     end_time_total = time.time()
     elapsed_time_total = end_time_total - start_time_total
@@ -213,36 +235,26 @@ def get_alternate_hostname(hostname):
         raise ValueError("Hostname does not end in '01' or '02'")
 
 def main():
-    parser = argparse.ArgumentParser(description="Process log files for WSO2.")
-    parser.add_argument('-d', '--date', type=str, help="Specify the date (format: YYYY-MM-DD).")
-    parser.add_argument('-t', '--time', nargs=2, metavar=('START_TIME', 'END_TIME'), help="Specify the start and end times (format: HH:MM:SS).")
-    
-    args = parser.parse_args()
     original_hostname = socket.gethostname()
+    date = input("Enter the date (in the format YYYY-MM-DD): ")
 
-    if args.date:
-        if not is_valid_date(args.date):
-            print("Invalid date format. Please use YYYY-MM-DD.")
-            return
-        if datetime.strptime(args.date, '%Y-%m-%d').date() > datetime.now().date():
-            print("Future date entered. Exiting.")
-            return
+    if not is_valid_date(date):
+        print("Invalid date format. Exiting.")
+        return
+    if datetime.strptime(date, '%Y-%m-%d').date() > datetime.now().date():
+        print("Future date entered. Exiting.")
+        return
 
-        if args.time:
-            if not (is_valid_time(args.time[0]) and is_valid_time(args.time[1])):
-                print("Invalid time format. Please use HH:MM:SS.")
-                return
-            process_log_files(args.date, original_hostname, args.time[0], args.time[1])
-        else:
-            process_log_files(args.date, original_hostname)
+    use_time_range = input("Do you want to specify a time range? (yes/no): ").lower()
+    if use_time_range == 'yes':
+        start_time = input("Enter the start time (HH:MM:SS): ")
+        end_time = input("Enter the end time (HH:MM:SS): ")
+        if not is_valid_time(start_time) or not is_valid_time(end_time):
+            print("Invalid time format. Exiting.")
+            return
+        process_log_files(date, original_hostname, start_time, end_time)
     else:
-        if args.time:
-            if not (is_valid_time(args.time[0]) and is_valid_time(args.time[1])):
-                print("Invalid time format. Please use HH:MM:SS.")
-                return
-            process_log_files(datetime.now().strftime('%Y-%m-%d'), original_hostname, args.time[0], args.time[1])
-        else:
-            process_log_files(datetime.now().strftime('%Y-%m-%d'), original_hostname)
+        process_log_files(date, original_hostname)
 
 if __name__ == "__main__":
     main()
