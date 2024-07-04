@@ -39,7 +39,7 @@ def extract_time(log_line):
 def print_response_fields(response_parts):
     print("\nResponse Code\tResponse Message\tHost Response Code\tActual Response Code\t\tPercentage\tTotal Count")
 
-    response_dict = defaultdict(lambda: defaultdict(Counter))
+    response_dict = defaultdict(lambda: defaultdict(int))
     total_counts = Counter()
 
     for part in response_parts:
