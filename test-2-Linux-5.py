@@ -49,7 +49,8 @@ def print_response_fields(response_parts):
         actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA')
         actual_response_code = actual_response_code if actual_response_code.strip() else 'NA'
 
-        response_dict[response_code][(response_message, host_response_code, actual_response_code)] += 1
+        key = (response_message, host_response_code, actual_response_code)
+        response_dict[response_code][key] += 1
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
