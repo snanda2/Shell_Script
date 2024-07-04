@@ -39,7 +39,7 @@ def extract_time(log_line):
 def print_response_fields(response_parts):
     print("\nResponse Code\tResponse Message\tHost Response Code\tActual Response Code\t\tPercentage\tTotal Count")
 
-    response_dict = defaultdict(list)
+    response_dict = defaultdict(lambda: defaultdict(Counter))
     total_counts = Counter()
 
     for part in response_parts:
@@ -49,17 +49,15 @@ def print_response_fields(response_parts):
         actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA')
         actual_response_code = actual_response_code if actual_response_code.strip() else 'NA'
 
-        response_dict[response_code].append((response_message, host_response_code, actual_response_code))
+        response_dict[response_code][(response_message, host_response_code, actual_response_code)] += 1
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
 
-    for response_code, entries in response_dict.items():
-        for entry in entries:
-            response_message, host_response_code, actual_response_code = entry
-            percentage = (total_counts[response_code] / total_out_messages) * 100
-
-            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{total_counts[response_code]}")
+    for response_code, message_dict in response_dict.items():
+        for (response_message, host_response_code, actual_response_code), count in message_dict.items():
+            percentage = (count / total_out_messages) * 100
+            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -236,19 +234,23 @@ def get_alternate_hostname(hostname):
 
 def main():
     original_hostname = socket.gethostname()
-    date = input("Enter the date (in the format YYYY-MM-DD): ")
 
-    if not is_valid_date(date):
-        print("Invalid date format. Exiting.")
-        return
-    if datetime.strptime(date, '%Y-%m-%d').date() > datetime.now().date():
-        print("Future date entered. Exiting.")
-        return
+    today = input("Is it today's date? (yes/no): ").strip().lower()
+    if today == 'yes':
+        date = datetime.now().strftime('%Y-%m-%d')
+    else:
+        date = input("Enter the date (in the format YYYY-MM-DD): ").strip()
+        if not is_valid_date(date):
+            print("Invalid date format. Exiting.")
+            return
+        if datetime.strptime(date, '%Y-%m-%d').date() > datetime.now().date():
+            print("Future date entered. Exiting.")
+            return
 
-    use_time_range = input("Do you want to specify a time range? (yes/no): ").lower()
+    use_time_range = input("Do you want to specify a time range? (yes/no): ").strip().lower()
     if use_time_range == 'yes':
-        start_time = input("Enter the start time (HH:MM:SS): ")
-        end_time = input("Enter the end time (HH:MM:SS): ")
+        start_time = input("Enter the start time (HH:MM:SS): ").strip()
+        end_time = input("Enter the end time (HH:MM:SS): ").strip()
         if not is_valid_time(start_time) or not is_valid_time(end_time):
             print("Invalid time format. Exiting.")
             return
