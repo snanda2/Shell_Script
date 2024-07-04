@@ -57,19 +57,13 @@ def print_response_fields(response_parts):
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
 
-    sorted_entries = []
     for response_code in sorted_response_codes:
         message_dict = response_dict[response_code]
-        for key, count in message_dict.items():
+        sorted_entries = sorted(message_dict.items(), key=lambda item: item[1], reverse=True)
+        for key, count in sorted_entries:
             response_message, host_response_code, actual_response_code = key
             percentage = (count / total_out_messages) * 100
-            sorted_entries.append((response_code, response_message, host_response_code, actual_response_code, percentage, count))
-
-    sorted_entries.sort(key=lambda x: x[5], reverse=True)
-
-    for entry in sorted_entries:
-        response_code, response_message, host_response_code, actual_response_code, percentage, count = entry
-        print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
+            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -144,7 +138,7 @@ def process_log_file(file_path, date, response_parts, total_out_messages_with_ce
 
 def extract_tar_file(tar_path, extract_to):
     try:
-        with tarfile.open(tar_path, 'r:gz') as tar:
+        with tarfile.open(tar_path, 'r:gz') as tar):
             tar.extractall(path=extract_to)
     except Exception as e:
         print(f"Error extracting tar file {tar_path}: {e}")
