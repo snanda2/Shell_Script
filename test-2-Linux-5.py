@@ -46,8 +46,7 @@ def print_response_fields(response_parts):
         response_code = str(part.get('responseCode', 'NA'))
         response_message = "Msg/Txn Id is Mandatory" if response_code == "4000001" else str(part.get('responseMessage', ''))
         host_response_code = str(part.get('hostResponseCode', 'NA'))
-        actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA')
-        actual_response_code = actual_response_code if actual_response_code.strip() else 'NA'
+        actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA').strip()
 
         key = (response_message, host_response_code, actual_response_code)
         response_dict[response_code][key] += 1
@@ -138,7 +137,7 @@ def process_log_file(file_path, date, response_parts, total_out_messages_with_ce
 
 def extract_tar_file(tar_path, extract_to):
     try:
-        with tarfile.open(tar_path, 'r:gz') as tar):
+        with tarfile.open(tar_path, 'r:gz') as tar:
             tar.extractall(path=extract_to)
     except Exception as e:
         print(f"Error extracting tar file {tar_path}: {e}")
