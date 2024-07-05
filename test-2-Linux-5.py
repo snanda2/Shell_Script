@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import json
 import re
@@ -37,7 +39,7 @@ def extract_time(log_line):
     return None
 
 def print_response_fields(response_parts):
-    print("\nResponse Code\tResponse Message\tHost Response Code\t\tPercentage\tTotal Count")
+    print("\nResponse Code\tResponse Message\tHost Response Code\tPercentage\tTotal Count")
 
     response_dict = defaultdict(lambda: defaultdict(int))
     total_counts = Counter()
@@ -48,8 +50,10 @@ def print_response_fields(response_parts):
         host_response_code = str(part.get('hostResponseCode', 'NA')).strip()
 
         # Normalize host response code for response code 0
-        if response_code == "0" and host_response_code not in ["002", "02"]:
-            host_response_code = "00"
+        if response_code == "0":
+            if host_response_code not in ["002", "02"]:
+                host_response_code = "00"
+                response_message = "Transactions Authorized"
 
         key = (response_message, host_response_code)
         response_dict[response_code][key] += 1
