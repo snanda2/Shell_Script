@@ -45,7 +45,11 @@ def print_response_fields(response_parts):
     for part in response_parts:
         response_code = str(part.get('responseCode', 'NA'))
         response_message = "Msg/Txn Id is Mandatory" if response_code == "4000001" else str(part.get('responseMessage', ''))
-        host_response_code = str(part.get('hostResponseCode', 'NA'))
+        host_response_code = str(part.get('hostResponseCode', 'NA')).strip()
+
+        # Normalize host response code for response code 0
+        if response_code == "0" and host_response_code not in ["002", "02"]:
+            host_response_code = "other"
 
         key = (response_message, host_response_code)
         response_dict[response_code][key] += 1
