@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import json
 import re
@@ -60,6 +58,7 @@ def print_response_fields(response_parts):
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
+    sum_all_response_codes = sum(total_counts.values())
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
 
@@ -70,6 +69,8 @@ def print_response_fields(response_parts):
             response_message, host_response_code = key
             percentage = (count / total_out_messages) * 100
             print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
+
+    print(f"\nSum of all response codes: {sum_all_response_codes}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
