@@ -37,7 +37,7 @@ def extract_time(log_line):
     return None
 
 def print_response_fields(response_parts):
-    print("\nResponse Code\tResponse Message\tHost Response Code\tActual Response Code\t\tPercentage\tTotal Count")
+    print("\nResponse Code\tResponse Message\tHost Response Code\tPercentage\tTotal Count")
 
     response_dict = defaultdict(lambda: defaultdict(int))
     total_counts = Counter()
@@ -46,26 +46,22 @@ def print_response_fields(response_parts):
         response_code = str(part.get('responseCode', 'NA'))
         response_message = "Msg/Txn Id is Mandatory" if response_code == "4000001" else str(part.get('responseMessage', ''))
         host_response_code = str(part.get('hostResponseCode', 'NA'))
-        actual_response_code = part.get('additionalResponseData', {}).get('actualResponseCode', 'NA').strip()
 
-        key = (response_message, host_response_code, actual_response_code)
+        key = (response_message, host_response_code)
         response_dict[response_code][key] += 1
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
-    print(f"Total OUT_MESSAGES: {total_out_messages}")
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
-    print(f"Sorted Response Codes: {sorted_response_codes}")
 
     for response_code in sorted_response_codes:
         message_dict = response_dict[response_code]
         sorted_entries = sorted(message_dict.items(), key=lambda item: item[1], reverse=True)
-        print(f"Sorted Entries for {response_code}: {sorted_entries}")
         for key, count in sorted_entries:
-            response_message, host_response_code, actual_response_code = key
+            response_message, host_response_code = key
             percentage = (count / total_out_messages) * 100
-            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{actual_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
+            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
