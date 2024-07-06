@@ -60,7 +60,20 @@ def print_response_fields(response_parts):
         total_counts[response_code] += 1
 
     total_out_messages = len(response_parts)
-    sum_all_response_codes = sum(total_counts.values())
+    total_successful_transactions = total_counts.get("0", 0)
+    total_failure_transactions = total_out_messages - total_successful_transactions
+
+    cis_decline_count = 0
+    non_cis_decline_count = 0
+
+    for response_code, count in total_counts.items():
+        if response_code != "0":
+            for key, sub_count in response_dict[response_code].items():
+                response_message, host_response_code = key
+                if response_code == "91" or (response_code == "8" and host_response_code == "905"):
+                    cis_decline_count += sub_count
+                else:
+                    non_cis_decline_count += sub_count
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
 
@@ -72,7 +85,11 @@ def print_response_fields(response_parts):
             percentage = (count / total_out_messages) * 100
             print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
-    print(f"\nSum of all response codes: {sum_all_response_codes}")
+    print(f"\nTotal Transactions Count: {total_out_messages}")
+    print(f"Total Successful Transactions Count: {total_successful_transactions}")
+    print(f"Total Failure Transactions Count: {total_failure_transactions}")
+    print(f"CIS Decline Count: {cis_decline_count}")
+    print(f"Non-CIS Decline Count: {non_cis_decline_count}")
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
