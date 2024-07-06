@@ -85,11 +85,7 @@ def print_response_fields(response_parts):
             percentage = (count / total_out_messages) * 100
             print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
-    print(f"\nTotal Transactions Count: {total_out_messages}")
-    print(f"Total Successful Transactions Count: {total_successful_transactions}")
-    print(f"Total Failure Transactions Count: {total_failure_transactions}")
-    print(f"CIS Decline Count: {cis_decline_count}")
-    print(f"Non-CIS Decline Count: {non_cis_decline_count}")
+    return total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -252,7 +248,16 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
     if overall_latest_time:
         print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    print_response_fields(response_parts)
+    total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count = print_response_fields(response_parts)
+
+    print("\nSummary Statistics")
+    print("=" * 50)
+    print(f"{'Total Transactions Count:':<35}{total_out_messages}")
+    print(f"{'Total Successful Transactions Count:':<35}{total_successful_transactions}")
+    print(f"{'Total Failure Transactions Count:':<35}{total_failure_transactions}")
+    print(f"{'CIS Decline Count:':<35}{cis_decline_count}")
+    print(f"{'Non-CIS Decline Count:':<35}{non_cis_decline_count}")
+    print("=" * 50)
 
     end_time_total = time.time()
     elapsed_time_total = end_time_total - start_time_total
