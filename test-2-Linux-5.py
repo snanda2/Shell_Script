@@ -39,8 +39,6 @@ def extract_time(log_line):
     return None
 
 def print_response_fields(response_parts):
-    print("\nResponse Code\tResponse Message\tHost Response Code\tPercentage\tTotal Count")
-
     response_dict = defaultdict(lambda: defaultdict(int))
     total_counts = Counter()
 
@@ -231,38 +229,41 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
             overall_latest_time = latest_time
 
     hostname = socket.gethostname()
-    print(f"\nExecuting on hostname: {hostname}")
-    print(f"\nTotal No. of IN_MESSAGE: {in_message_count}")
-    print(f"Total No. of OUT_MESSAGE: {total_out_messages}")
+    
+    total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count = print_response_fields(response_parts)
+
+    print("\n==========================Transaction Statistic==================================")
+    print(f"Executing on hostname: {hostname}")
+    if overall_earliest_time:
+        print(f"Start Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if overall_latest_time:
+        print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Total No.of IN_MESSAGE: {in_message_count}")
+    print(f"Total No.of OUT_MESSAGE: {total_out_messages}")
 
     if in_message_count > total_out_messages:
         dropped_message_percentage = ((in_message_count - total_out_messages) / in_message_count) * 100
         if dropped_message_percentage > 0:
-            print(f"Dropped MESSAGE Percentage: {dropped_message_percentage:.2f}%")
+            print(f"Dropped Message Percentage: {dropped_message_percentage:.2f}%")
 
     if total_out_messages_with_certificate > 0:
         print(f"Total No. of OUT_MESSAGE that contains certificate: {total_out_messages_with_certificate}")
 
-    if overall_earliest_time:
-        print(f"\nStart Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    if overall_latest_time:
-        print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Total Transaction Count: {total_out_messages}")
+    print(f"Total Successful Transactions Count: {total_successful_transactions}")
+    print(f"Total Failure Transactions Count: {total_failure_transactions}")
+    print(f"CIS Decline Count: {cis_decline_count}")
+    print(f"Non-CIS Decline Count: {non_cis_decline_count}")
+    print("===============================================================================")
 
-    total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count = print_response_fields(response_parts)
-
-    print("\nSummary Statistics")
-    print("=" * 50)
-    print(f"{'Total Transactions Count:':<35}{total_out_messages}")
-    print(f"{'Total Successful Transactions Count:':<35}{total_successful_transactions}")
-    print(f"{'Total Failure Transactions Count:':<35}{total_failure_transactions}")
-    print(f"{'CIS Decline Count:':<35}{cis_decline_count}")
-    print(f"{'Non-CIS Decline Count:':<35}{non_cis_decline_count}")
-    print("=" * 50)
+    print("\n================Detailed Response Code Information=============================")
+    print("Response Code\tResponse Message\tHost Response Code\tPercentage\tTotal Count")
 
     end_time_total = time.time()
     elapsed_time_total = end_time_total - start_time_total
     script_name = os.path.basename(__file__)
     print(f"\nScript '{script_name}' completed in {elapsed_time_total:.2f} seconds.")
+    print("===============================================================================")
 
 def get_alternate_hostname(hostname):
     if hostname.endswith('01'):
