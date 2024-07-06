@@ -235,10 +235,14 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
 
     print("\n=========================Transaction Statistic===============================")
     print(f"Executing on hostname: {hostname}")
-    if overall_earliest_time:
-        print(f"Start Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    if overall_latest_time:
-        print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if start_time and end_time:
+        print(f"Start Time: {start_time}")
+        print(f"End Time: {end_time}")
+    else:
+        if overall_earliest_time:
+            print(f"Start Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        if overall_latest_time:
+            print(f"End Time: {overall_latest_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Total No.of IN_MESSAGE: {in_message_count}")
     print(f"Total No.of OUT_MESSAGE: {total_out_messages}")
 
