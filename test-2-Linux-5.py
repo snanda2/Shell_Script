@@ -75,15 +75,16 @@ def print_response_fields(response_parts):
 
     sorted_response_codes = sorted(response_dict.keys(), key=lambda x: (int(x) if x.isdigit() else float('inf')))
 
+    detailed_info = []
     for response_code in sorted_response_codes:
         message_dict = response_dict[response_code]
         sorted_entries = sorted(message_dict.items(), key=lambda item: item[1], reverse=True)
         for key, count in sorted_entries:
             response_message, host_response_code = key
             percentage = (count / total_out_messages) * 100
-            print(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
+            detailed_info.append(f"{response_code.ljust(15)}\t{response_message.ljust(25)}\t{host_response_code.ljust(20)}\t{percentage:.2f}%\t\t{count}")
 
-    return total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count
+    return total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count, detailed_info
 
 def print_after_response(line):
     match = re.search(r'--- Response ---\s*=\s*({.+})(?:,\s*messageType\s*=\s*application/json)?\s*$', line)
@@ -230,9 +231,9 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
 
     hostname = socket.gethostname()
     
-    total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count = print_response_fields(response_parts)
+    total_out_messages, total_successful_transactions, total_failure_transactions, cis_decline_count, non_cis_decline_count, detailed_info = print_response_fields(response_parts)
 
-    print("\n==========================Transaction Statistic==================================")
+    print("\n=========================Transaction Statistic===============================")
     print(f"Executing on hostname: {hostname}")
     if overall_earliest_time:
         print(f"Start Time: {overall_earliest_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -254,16 +255,18 @@ def process_log_files(date, original_hostname, start_time=None, end_time=None):
     print(f"Total Failure Transactions Count: {total_failure_transactions}")
     print(f"CIS Decline Count: {cis_decline_count}")
     print(f"Non-CIS Decline Count: {non_cis_decline_count}")
-    print("===============================================================================")
+    print("==============================================================================")
 
-    print("\n================Detailed Response Code Information=============================")
+    print("\n================Detailed Response Code Information============================")
     print("Response Code\tResponse Message\tHost Response Code\tPercentage\tTotal Count")
+    for info in detailed_info:
+        print(info)
+    print("==============================================================================")
 
     end_time_total = time.time()
     elapsed_time_total = end_time_total - start_time_total
     script_name = os.path.basename(__file__)
     print(f"\nScript '{script_name}' completed in {elapsed_time_total:.2f} seconds.")
-    print("===============================================================================")
 
 def get_alternate_hostname(hostname):
     if hostname.endswith('01'):
