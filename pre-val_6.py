@@ -8,7 +8,6 @@ from datetime import datetime
 import argparse
 import psutil
 import sys
-import time
 import re
 import json
 import smtplib
@@ -19,10 +18,8 @@ from email import encoders
 
 def is_process_running(process_name):
     """Checks if a process is running by name or in its command line arguments.
-
     Args:
         process_name (str): The name of the process to check.
-
     Returns:
         bool: True if the process is running, False otherwise.
     """
@@ -35,7 +32,7 @@ def is_process_running(process_name):
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
-PRE_VALIDATION_STATE_FILE = "prevalidation_state.json"
+STATE_FILE_DIR = "state_files"
 
 # Email Configuration
 SMTP_SERVER = "smtp.example.com"
@@ -200,8 +197,17 @@ class ServerManager:
         self.action = action
         self.setup_logging()
         self.overall_status = True  # To track overall script status
+        self.state_file = os.path.join(STATE_FILE_DIR, f"{self.hostname}_{self.action}_state.json")
         self.prevalidation_state = {
-            "processes": []
+            "hostname": self.hostname,
+            "processes": [],
+            "mailbox_status": "",
+            "ports": {
+                "disconnected": [],
+                "passive": [],
+                "stopped": []
+            },
+            "bins_down": []
         }
 
     def setup_logging(self):
@@ -294,10 +300,13 @@ class ServerManager:
 
             if "IST Mail Box up since" in filtered_output:
                 logging.info("IST Mail Box is up and active.")
+                self.prevalidation_state["mailbox_status"] = "up"
                 return True
             elif "Mail box system not active" in filtered_output:
+                self.prevalidation_state["mailbox_status"] = "not active"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
+                self.prevalidation_state["mailbox_status"] = "unexpected output"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Unexpected mailbox status output")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
@@ -517,6 +526,10 @@ class ServerManager:
             if stopped_ports:
                 logging.info("Stopped ports found:\n" + "\n".join(stopped_ports))
 
+        self.prevalidation_state["ports"]["disconnected"] = disconnected_ports
+        self.prevalidation_state["ports"]["passive"] = passive_ports
+        self.prevalidation_state["ports"]["stopped"] = stopped_ports
+
     def _handle_shccmd_output(self, output):
         """Handle the output of shccmd list to check for bins that are down."""
         down_bins = []
@@ -536,12 +549,15 @@ class ServerManager:
         if down_bins:
             logging.info("Bins found in down status:\n" + "\n".join(down_bins))
 
+        self.prevalidation_state["bins_down"] = down_bins
+
     def pre_validation(self):
         """Perform pre-validation tasks."""
         logging.info("Starting pre-validation...")
         self._check_processes()
         self.execute_commands("pre_validation")
         self.save_prevalidation_state()
+        self.shutdown()
 
     def _check_processes(self):
         """Check the status of required processes and log the results."""
@@ -556,7 +572,8 @@ class ServerManager:
     def save_prevalidation_state(self):
         """Save the pre-validation state to a file."""
         try:
-            with open(PRE_VALIDATION_STATE_FILE, 'w') as f:
+            os.makedirs(STATE_FILE_DIR, exist_ok=True)
+            with open(self.state_file, 'w') as f:
                 json.dump(self.prevalidation_state, f)
             logging.info("Pre-validation state saved successfully.")
         except Exception as e:
