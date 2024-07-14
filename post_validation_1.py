@@ -16,11 +16,23 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
+def is_process_running(process_name):
+    """Checks if a process is running by name or in its command line arguments.
+    Args:
+        process_name (str): The name of the process to check.
+    Returns:
+        bool: True if the process is running, False otherwise.
+    """
+    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if process_name in process.info['name'] or any(process_name in cmd for cmd in process.info['cmdline']):
+            return True
+    return False
+
 # Constants for log directory and file extensions
 LOG_DIR = "logs"
 LOG_EXTENSION = ".log"
 FAILED_LOG_SUFFIX = "_failed"
-PRE_VALIDATION_STATE_FILE = "prevalidation_state.json"
+STATE_FILE_DIR = "state_files"
 
 # Email Configuration
 SMTP_SERVER = "smtp.example.com"
@@ -33,12 +45,144 @@ RECEIVER_EMAIL = "receiver_email@example.com"
 # Exit codes
 EXIT_SUCCESS = 0
 EXIT_GENERAL_FAILURE = 1
-EXIT_POSTVALIDATION_FAILURE = 11
+EXIT_PREVALIDATION_FAILURE = 2
+EXIT_SHUTDOWN_FAILURE = 3
+EXIT_COMMAND_EXECUTION_FAILURE = 4
+EXIT_PROCESS_NOT_FOUND = 5
+EXIT_SCRIPT_NOT_FOUND = 6
+EXIT_UNKNOWN_ACTION = 7
+EXIT_UNKNOWN_CLIENT_OR_SERVER = 8
+EXIT_MAILBOX_NOT_ACTIVE = 9
+EXIT_SHARED_MEMORY_SEGMENT_FOUND = 10
 
 EXIT_CODE_DESCRIPTIONS = {
     EXIT_SUCCESS: "Script completed successfully.",
     EXIT_GENERAL_FAILURE: "General failure.",
-    EXIT_POSTVALIDATION_FAILURE: "Post-validation failure."
+    EXIT_PREVALIDATION_FAILURE: "Pre-validation failure.",
+    EXIT_SHUTDOWN_FAILURE: "Shutdown failure.",
+    EXIT_COMMAND_EXECUTION_FAILURE: "Command execution failure.",
+    EXIT_PROCESS_NOT_FOUND: "Process not found.",
+    EXIT_SCRIPT_NOT_FOUND: "Script not found.",
+    EXIT_UNKNOWN_ACTION: "Unknown action specified.",
+    EXIT_UNKNOWN_CLIENT_OR_SERVER: "Unknown client or server type.",
+    EXIT_MAILBOX_NOT_ACTIVE: "Mailbox not active.",
+    EXIT_SHARED_MEMORY_SEGMENT_FOUND: "Shared memory segment found for istadm."
+}
+
+# Server and client specific commands
+SERVER_SPECIFIC_COMMANDS = {
+    "switch_server": {
+        "startup": [
+            "start.sh",
+            "istnodeagt start",
+            "oentsrv start"
+        ],
+        "post_validation": [
+            "echo Kernel version below:",
+            "uname -r",
+            "echo Checking mailbox status below:",
+            "echo -e 'exit' | mbcmd",
+            "mbcmd tasks",
+            "mbportcmd list",
+            "shccmd list"
+        ],
+        "processes": ["istnodeagt", "oentsrv", "oassrv", "splunkd", "nxagentd", "producer"]
+    },
+    "L7_server": {
+        "startup": [
+            "start.sh",
+            "istnodeagt start"
+        ],
+        "post_validation": [
+            "echo Kernel version below:",
+            "uname -r",
+            "echo Checking mailbox status below:",
+            "echo -e 'exit' | mbcmd",
+            "mbcmd tasks",
+            "mbportcmd list",
+            "shccmd list"
+        ],
+        "processes": ["istnodeagt", "ist-api-services"]
+    },
+    "wso2_server": {
+        "startup": [
+            "/data/wso2/wso2am-3.2.0/bin/wso2server.sh start",
+        ],
+        "post_validation": [
+            "ps -ef | grep wso2 | grep -v grep"
+        ],
+        "processes": ["wso2"]
+    },
+    "gui_server": {
+        "startup": [
+            "./start.sh",
+        ],
+        "post_validation": [
+            "echo GUI post-validation"
+        ],
+        "processes": ["guiproc"]
+    },
+    "sftp_server": {
+        "startup": [
+            "./start.sh",
+        ],
+        "post_validation": [
+            "echo SFTP post-validation"
+        ],
+        "processes": ["sftpd"]
+    }
+}
+
+# Configuration for commands based on client and server type
+COMMANDS = {
+    "client1": SERVER_SPECIFIC_COMMANDS,
+    "client2": SERVER_SPECIFIC_COMMANDS,
+    "client3": {
+        "api_server": {
+            "startup": [
+                "./start.sh",
+                "start oentsrv"
+            ],
+            "post_validation": [
+                "echo Kernel version below:",
+                "uname -r",
+                "echo Checking mailbox status below:",
+                "echo -e 'exit' | mbcmd",
+                "mbcmd tasks"
+            ],
+            "processes": ["splunkd", "nxagentd", "producer"]
+        },
+        "wso2_server": {
+            "startup": [
+                "./start.sh",
+                "start oentsrv"
+            ],
+            "post_validation": [
+                "ps -ef | grep wso2 | grep -v grep"
+            ],
+            "processes": ["wso2"]
+        },
+        "gui_server": {
+            "startup": [
+                "./start.sh",
+                "start oentsrv"
+            ],
+            "post_validation": [
+                "echo GUI post-validation"
+            ],
+            "processes": ["guiproc"]
+        },
+        "sftp_server": {
+            "startup": [
+                "./start.sh",
+                "start oentsrv"
+            ],
+            "post_validation": [
+                "echo SFTP post-validation"
+            ],
+            "processes": ["sftpd"]
+        }
+    }
 }
 
 class ServerManager:
@@ -51,8 +195,9 @@ class ServerManager:
         self.action = action
         self.setup_logging()
         self.overall_status = True  # To track overall script status
-        self.prevalidation_state = self.read_prevalidation_state()
-        self.postvalidation_state = {
+        self.state_file = os.path.join(STATE_FILE_DIR, f"{self.hostname}_prevalidation_state.json")
+        self.post_validation_state = {
+            "hostname": self.hostname,
             "processes": [],
             "mailbox_status": "",
             "ports": {
@@ -143,69 +288,6 @@ class ServerManager:
                 return "East"
         return "Unknown"
 
-    def read_prevalidation_state(self):
-        """Read the pre-validation state from a file."""
-        try:
-            with open(PRE_VALIDATION_STATE_FILE, 'r') as f:
-                prevalidation_state = json.load(f)
-            logging.info("Pre-validation state read successfully.")
-            return prevalidation_state
-        except Exception as e:
-            logging.error(f"Failed to read pre-validation state. Error: {e}")
-            self.log_and_exit(EXIT_GENERAL_FAILURE, "Failed to read pre-validation state")
-
-    def bringup_services(self):
-        """Bring up the services."""
-        logging.info("Bringing up services...")
-        self.execute_commands("bringup")
-
-    def execute_commands(self, command_type):
-        """Execute the commands for the given command type (bringup)."""
-        if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
-            self.log_and_exit(EXIT_GENERAL_FAILURE, "Unknown client or server type")
-
-        commands = COMMANDS[self.client][self.server_type].get(command_type, [])
-        for command in commands:
-            self._execute_command(command)
-
-    def _execute_command(self, command):
-        """Execute a single command and log the result."""
-        try:
-            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output = result.stdout.decode().strip()
-            status_code = result.returncode
-            logging.info(f"Executed command: {command}")
-            logging.info(f"Output:\n{output}")
-            logging.info(f"Status code: {status_code}")
-            if status_code != 0:
-                self.overall_status = False
-
-        except subprocess.CalledProcessError as e:
-            error_output = e.stderr.decode().strip()
-            status_code = e.returncode
-            logging.error(f"Failed to execute command: {command}")
-            logging.error(f"Error:\n{error_output}")
-            logging.error(f"Status code: {status_code}")
-
-            if status_code == 127:
-                self.log_and_exit(EXIT_GENERAL_FAILURE, "Command not found")
-            elif status_code == 126:
-                self.log_and_exit(EXIT_GENERAL_FAILURE, "Command cannot execute")
-            elif status_code == 1:
-                self.log_and_exit(EXIT_GENERAL_FAILURE, "General error")
-            
-            self.overall_status = False
-
-    def post_validation(self):
-        """Perform post-validation tasks."""
-        logging.info("Starting post-validation...")
-        self.check_mailbox_status()
-        self.check_processes()
-        self.check_ports()
-        self.check_bins()
-        self.compare_states()
-        self.log_post_validation_results()
-
     def check_mailbox_status(self):
         """Check the IST Mail Box status."""
         try:
@@ -216,17 +298,18 @@ class ServerManager:
 
             if "IST Mail Box up since" in filtered_output:
                 logging.info("IST Mail Box is up and active.")
-                self.postvalidation_state["mailbox_status"] = "up"
+                self.post_validation_state["mailbox_status"] = "up"
+                return True
             elif "Mail box system not active" in filtered_output:
-                logging.info("Mail box system not active.")
-                self.postvalidation_state["mailbox_status"] = "not active"
+                self.post_validation_state["mailbox_status"] = "not active"
+                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
-                logging.info("Unexpected mailbox status output.")
-                self.postvalidation_state["mailbox_status"] = "unexpected"
+                self.post_validation_state["mailbox_status"] = "unexpected output"
+                self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Unexpected mailbox status output")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
-            self.postvalidation_state["mailbox_status"] = "error"
+            self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Failed to check mailbox status")
 
     @staticmethod
     def _filter_mbcmd_output(output):
@@ -235,130 +318,6 @@ class ServerManager:
             if "IST Mail Box" in line:
                 return line
         return "Desired line not found in mbcmd output."
-
-    def check_processes(self):
-        """Check the status of required processes and log the results."""
-        processes = self.prevalidation_state.get("processes", [])
-        for process in processes:
-            if is_process_running(process):
-                logging.info(f"Process {process} is running - OK")
-                self.postvalidation_state["processes"].append(process)
-            else:
-                logging.error(f"Process {process} is not running - NOT OK")
-                self.overall_status = False
-
-    def check_ports(self):
-        """Check the status of ports."""
-        if self.server_type in ["switch_server", "L7_server"]:
-            result = subprocess.run("mbportcmd list", shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output = result.stdout.decode().strip()
-            self._handle_portcmd_output(output)
-
-    def _handle_portcmd_output(self, output):
-        """Handle the output of mbportcmd list to check for disconnected, passive, or stopped ports."""
-        disconnected_ports = []
-        passive_ports = []
-        stopped_ports = []
-
-        current_port_info = ""
-        for line in output.splitlines():
-            if re.match(r'^\[\s*\d+\]:', line):  # Matches lines like "[ 21]:"
-                current_port_info = line
-            elif "disconnected" in line or "passive" in line or "stopped" in line:
-                state = "disconnected" if "disconnected" in line else "passive" if "passive" in line else "stopped"
-                full_info = f"{current_port_info}\n\t{line.strip()}"
-                if state == "disconnected":
-                    disconnected_ports.append(full_info)
-                elif state == "passive":
-                    passive_ports.append(full_info)
-                elif state == "stopped":
-                    stopped_ports.append(full_info)
-
-        if disconnected_ports or passive_ports or stopped_ports:
-            if disconnected_ports:
-                logging.info("Disconnected ports found:\n" + "\n".join(disconnected_ports))
-            if passive_ports:
-                logging.info("Passive ports found:\n" + "\n".join(passive_ports))
-            if stopped_ports:
-                logging.info("Stopped ports found:\n" + "\n".join(stopped_ports))
-
-        self.postvalidation_state["ports"]["disconnected"] = disconnected_ports
-        self.postvalidation_state["ports"]["passive"] = passive_ports
-        self.postvalidation_state["ports"]["stopped"] = stopped_ports
-
-    def check_bins(self):
-        """Check the status of bins."""
-        if self.server_type in ["switch_server", "L7_server"]:
-            result = subprocess.run("shccmd list", shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output = result.stdout.decode().strip()
-            self._handle_shccmd_output(output)
-
-    def _handle_shccmd_output(self, output):
-        """Handle the output of shccmd list to check for bins that are down."""
-        down_bins = []
-
-        current_bin_info = ""
-        for line in output.splitlines():
-            if re.match(r'^\[\s*\d+\]:', line):  # Matches lines like "[ 1]:"
-                if current_bin_info:
-                    current_bin_info += f"\n{line.strip()}"
-                else:
-                    current_bin_info = line.strip()
-            elif "Status: Down" in line:
-                full_info = f"{current_bin_info}\n\t{line.strip()}"
-                down_bins.append(full_info)
-                current_bin_info = ""
-
-        if down_bins:
-            logging.info("Bins found in down status:\n" + "\n".join(down_bins))
-
-        self.postvalidation_state["bins_down"] = down_bins
-
-    def compare_states(self):
-        """Compare pre-validation and post-validation states."""
-        if self.prevalidation_state["mailbox_status"] == self.postvalidation_state["mailbox_status"]:
-            logging.info("Mailbox status matches pre-validation - OK")
-        else:
-            logging.error("Mailbox status does not match pre-validation - NOT OK")
-            self.overall_status = False
-
-        if self.prevalidation_state["processes"] == self.postvalidation_state["processes"]:
-            logging.info("Processes match pre-validation - OK")
-        else:
-            logging.error("Processes do not match pre-validation - NOT OK")
-            self.overall_status = False
-
-        if self.prevalidation_state["ports"]["disconnected"] == self.postvalidation_state["ports"]["disconnected"]:
-            logging.info("Disconnected ports match pre-validation - OK")
-        else:
-            logging.error("Disconnected ports do not match pre-validation - NOT OK")
-            self.overall_status = False
-
-        if self.prevalidation_state["ports"]["passive"] == self.postvalidation_state["ports"]["passive"]:
-            logging.info("Passive ports match pre-validation - OK")
-        else:
-            logging.error("Passive ports do not match pre-validation - NOT OK")
-            self.overall_status = False
-
-        if self.prevalidation_state["ports"]["stopped"] == self.postvalidation_state["ports"]["stopped"]:
-            logging.info("Stopped ports match pre-validation - OK")
-        else:
-            logging.error("Stopped ports do not match pre-validation - NOT OK")
-            self.overall_status = False
-
-        if self.prevalidation_state["bins_down"] == self.postvalidation_state["bins_down"]:
-            logging.info("Bins down match pre-validation - OK")
-        else:
-            logging.error("Bins down do not match pre-validation - NOT OK")
-            self.overall_status = False
-
-    def log_post_validation_results(self):
-        """Log the results of the post-validation checks."""
-        if self.overall_status:
-            logging.info("Post-validation completed successfully - ALL OK")
-        else:
-            logging.error("Post-validation completed with errors - NOT OK")
-        self.log_and_exit(EXIT_SUCCESS if self.overall_status else EXIT_POSTVALIDATION_FAILURE)
 
     def log_and_exit(self, exit_code, message=""):
         """Log the exit code and exit the script."""
@@ -402,7 +361,7 @@ class ServerManager:
         msg.attach(MIMEText(body, 'plain'))
 
         # Attach log file
-        with open(log_file, "rb") as attachment:
+        with open(log_file, "rb") as attachment):
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment.read())
             encoders.encode_base64(part)
@@ -420,8 +379,246 @@ class ServerManager:
         except Exception as e:
             logging.error(f"Failed to send email notification. Error: {e}")
 
+    def execute_commands(self, command_type):
+        """Execute the commands for the given command type (startup or post_validation)."""
+        if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
+            self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER, "Unknown client or server type")
+
+        if self.server_type in ["switch_server", "L7_server"]:
+            if not self.check_mailbox_status():
+                logging.error("Mailbox status check failed. Exiting script.")
+                return
+
+        commands = COMMANDS[self.client][self.server_type].get(command_type, [])
+        for command in commands:
+            if "kill" in command:
+                process_name = command.split()[1]
+                if is_process_running(process_name):
+                    logging.info(f"Process {process_name} is running, proceeding to kill.")
+                    self._execute_command(command)
+                else:
+                    logging.info(f"Process {process_name} is not running.")
+            elif "cleanipc.sh" in command:
+                self._execute_command_synchronously(command)
+                time.sleep(10)
+            elif "ipcs" in command:
+                output = self._execute_command_synchronously(command)
+                self._handle_ipcs_output(output)
+            elif "mbportcmd list" in command:
+                output = self._execute_command_synchronously(command)
+                self._handle_portcmd_output(output)
+            elif "shccmd list" in command:
+                output = self._execute_command_synchronously(command)
+                self._handle_shccmd_output(output)
+            else:
+                self._execute_command(command)
+
+    def _execute_command(self, command):
+        """Execute a single command and log the result."""
+        try:
+            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode().strip()
+            status_code = result.returncode
+            logging.info(f"Executed command: {command}")
+            logging.info(f"Output:\n{output}")
+            logging.info(f"Status code: {status_code}")
+            if status_code != 0:
+                self.overall_status = False
+
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode().strip()
+            status_code = e.returncode
+            logging.error(f"Failed to execute command: {command}")
+            logging.error(f"Error:\n{error_output}")
+            logging.error(f"Status code: {status_code}")
+
+            if status_code == 127:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
+            elif status_code == 126:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
+            elif status_code == 1:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
+            
+            self.overall_status = False
+
+    def _execute_command_synchronously(self, command):
+        """Execute a single command synchronously and return the output."""
+        try:
+            result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode().strip()
+            error_output = result.stderr.decode().strip()
+            status_code = result.returncode
+            logging.info(f"Executed command: {command}")
+            logging.info(f"Output:\n{output}")
+            logging.info(f"Status code: {status_code}")
+            if error_output:
+                logging.error(f"Error Output:\n{error_output}")
+            if status_code != 0:
+                self.overall_status = False
+            return output
+
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode().strip()
+            status_code = e.returncode
+            logging.error(f"Failed to execute command: {command}")
+            logging.error(f"Error:\n{error_output}")
+            logging.error(f"Status code: {status_code}")
+
+            if status_code == 127:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command not found")
+            elif status_code == 126:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "Command cannot execute")
+            elif status_code == 1:
+                self.log_and_exit(EXIT_COMMAND_EXECUTION_FAILURE, "General error")
+
+            self.overall_status = False
+            return None
+
+    def _handle_ipcs_output(self, output):
+        """Handle the output of the ipcs command to check for shared memory segments."""
+        istadm_found = False
+
+        shared_memory_section = False
+        for line in output.splitlines():
+            if re.match(r'------\s*Shared Memory Segments\s*------', line):
+                shared_memory_section = True
+            elif re.match(r'------\s*\w+\s*------', line):
+                shared_memory_section = False
+
+            if shared_memory_section and "istadm" in line:
+                istadm_found = True
+                logging.error(f"Shared memory segment found for istadm: {line}")
+                self.log_and_exit(EXIT_SHARED_MEMORY_SEGMENT_FOUND, "Shared memory segment found for istadm")
+
+        if not istadm_found:
+            logging.info("No shared memory segments for istadm, shutdown is complete and clean.")
+        else:
+            logging.error("Shared memory segments for istadm were found during shutdown.")
+            self.overall_status = False
+
+    def _handle_portcmd_output(self, output):
+        """Handle the output of mbportcmd list to check for disconnected, passive, or stopped ports."""
+        disconnected_ports = []
+        passive_ports = []
+        stopped_ports = []
+
+        current_port_info = ""
+        for line in output.splitlines():
+            if re.match(r'^\[\s*\d+\]:', line):  # Matches lines like "[ 21]:"
+                current_port_info = line
+            elif "disconnected" in line or "passive" in line or "stopped" in line:
+                state = "disconnected" if "disconnected" in line else "passive" if "passive" in line else "stopped"
+                full_info = f"{current_port_info}\n\t{line.strip()}"
+                if state == "disconnected":
+                    disconnected_ports.append(full_info)
+                elif state == "passive":
+                    passive_ports.append(full_info)
+                elif state == "stopped":
+                    stopped_ports.append(full_info)
+
+        if disconnected_ports or passive_ports or stopped_ports:
+            if disconnected_ports:
+                logging.info("Disconnected ports found:\n" + "\n".join(disconnected_ports))
+            if passive_ports:
+                logging.info("Passive ports found:\n" + "\n".join(passive_ports))
+            if stopped_ports:
+                logging.info("Stopped ports found:\n" + "\n".join(stopped_ports))
+
+        self.post_validation_state["ports"]["disconnected"] = disconnected_ports
+        self.post_validation_state["ports"]["passive"] = passive_ports
+        self.post_validation_state["ports"]["stopped"] = stopped_ports
+
+    def _handle_shccmd_output(self, output):
+        """Handle the output of shccmd list to check for bins that are down."""
+        down_bins = []
+
+        current_bin_info = ""
+        for line in output.splitlines():
+            if re.match(r'^\[\s*\d+\]:', line):  # Matches lines like "[ 1]:"
+                if current_bin_info:
+                    current_bin_info += f"\n{line.strip()}"
+                else:
+                    current_bin_info = line.strip()
+            elif "Status: Down" in line:
+                full_info = f"{current_bin_info}\n\t{line.strip()}"
+                down_bins.append(full_info)
+                current_bin_info = ""
+
+        if down_bins:
+            logging.info("Bins found in down status:\n" + "\n".join(down_bins))
+
+        self.post_validation_state["bins_down"] = down_bins
+
+    def startup(self):
+        """Perform startup tasks."""
+        logging.info("Starting services...")
+        self.execute_commands("startup")
+
+    def post_validation(self):
+        """Perform post-validation tasks."""
+        logging.info("Starting post-validation...")
+        self._check_processes()
+        self.execute_commands("post_validation")
+        self.compare_states()
+
+    def _check_processes(self):
+        """Check the status of required processes and log the results."""
+        processes = COMMANDS[self.client][self.server_type].get("processes", [])
+        for process in processes:
+            if is_process_running(process):
+                logging.info(f"Process {process} is running")
+                self.post_validation_state["processes"].append(process)
+            else:
+                logging.warning(f"Process {process} is not running")
+
+    def compare_states(self):
+        """Compare pre-validation and post-validation states."""
+        try:
+            with open(self.state_file, 'r') as f:
+                prevalidation_state = json.load(f)
+            logging.info("Loaded pre-validation state successfully.")
+        except Exception as e:
+            logging.error(f"Failed to load pre-validation state. Error: {e}")
+            self.log_and_exit(EXIT_GENERAL_FAILURE, "Failed to load pre-validation state")
+
+        differences = []
+        
+        # Compare processes
+        prevalidation_processes = set(prevalidation_state["processes"])
+        post_validation_processes = set(self.post_validation_state["processes"])
+
+        if prevalidation_processes != post_validation_processes:
+            differences.append("Process state mismatch.")
+            logging.error("Process state mismatch.")
+
+        # Compare mailbox status
+        if prevalidation_state["mailbox_status"] != self.post_validation_state["mailbox_status"]:
+            differences.append("Mailbox status mismatch.")
+            logging.error("Mailbox status mismatch.")
+
+        # Compare ports
+        for port_state in ["disconnected", "passive", "stopped"]:
+            prevalidation_ports = set(prevalidation_state["ports"][port_state])
+            post_validation_ports = set(self.post_validation_state["ports"][port_state])
+            if prevalidation_ports != post_validation_ports:
+                differences.append(f"{port_state.capitalize()} ports state mismatch.")
+                logging.error(f"{port_state.capitalize()} ports state mismatch.")
+
+        # Compare bins down
+        prevalidation_bins_down = set(prevalidation_state["bins_down"])
+        post_validation_bins_down = set(self.post_validation_state["bins_down"])
+        if prevalidation_bins_down != post_validation_bins_down:
+            differences.append("Bins down state mismatch.")
+            logging.error("Bins down state mismatch.")
+
+        if differences:
+            logging.error("Post-validation completed with differences.")
+            self.overall_status = False
+        else:
+            logging.info("Post-validation completed successfully. All states match.")
+
     def run(self):
-        """Run the specified action (bringup and post-validation)."""
+        """Run the specified action (startup or post-validation)."""
         logging.info(f"Hostname: {self.hostname}")
         logging.info(f"Identified client: {self.client}")
         logging.info(f"Identified environment: {self.environment}")
@@ -429,16 +626,28 @@ class ServerManager:
         logging.info(f"Identified server type: {self.server_type}")
 
         try:
-            self.bringup_services()
-            self.post_validation()
+            if self.action == "startup":
+                self.startup()
+            elif self.action == "postvalidation":
+                self.post_validation()
+            else:
+                self.log_and_exit(EXIT_UNKNOWN_ACTION, "Unknown action")
         except Exception as e:
             logging.error(f"Script execution stopped due to an error: {e}")
             self.log_and_exit(EXIT_GENERAL_FAILURE, "General failure")
 
+        # Log the overall status of the script
+        if self.overall_status:
+            logging.info("Script completed successfully.")
+            self.log_and_exit(EXIT_SUCCESS)
+        else:
+            logging.error("Script completed with errors.")
+            self.log_and_exit(EXIT_GENERAL_FAILURE, "Script completed with errors")
+
 def main():
     """Main entry point for the script."""
-    parser = argparse.ArgumentParser(description="Bringup and Post-validation Script.")
-    parser.add_argument("action", choices=["postvalidation"], help="Action to perform")
+    parser = argparse.ArgumentParser(description="Auto Patching Script.")
+    parser.add_argument("action", choices=["startup", "postvalidation"], help="Action to perform")
     args = parser.parse_args()
 
     manager = ServerManager(args.action)
