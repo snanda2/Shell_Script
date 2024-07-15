@@ -75,7 +75,7 @@ SERVER_SPECIFIC_COMMANDS = {
         "startup": [
             "start.sh",
             "istnodeagt start",
-            "oentsrv start"
+            "start_producer.sh"
         ],
         "post_validation": [
             "echo Kernel version below:",
@@ -91,7 +91,8 @@ SERVER_SPECIFIC_COMMANDS = {
     "L7_server": {
         "startup": [
             "start.sh",
-            "istnodeagt start"
+            "istnodeagt start",
+            "start_ist_api_services.sh"
         ],
         "post_validation": [
             "echo Kernel version below:",
@@ -106,7 +107,7 @@ SERVER_SPECIFIC_COMMANDS = {
     },
     "wso2_server": {
         "startup": [
-            "/data/wso2/wso2am-3.2.0/bin/wso2server.sh start",
+            "/data/wso2/wso2am-3.2.0/bin/wso2server.sh start"
         ],
         "post_validation": [
             "ps -ef | grep wso2 | grep -v grep"
@@ -115,7 +116,7 @@ SERVER_SPECIFIC_COMMANDS = {
     },
     "gui_server": {
         "startup": [
-            "./start.sh",
+            "./start.sh"
         ],
         "post_validation": [
             "echo GUI post-validation"
@@ -124,7 +125,7 @@ SERVER_SPECIFIC_COMMANDS = {
     },
     "sftp_server": {
         "startup": [
-            "./start.sh",
+            "./start.sh"
         ],
         "post_validation": [
             "echo SFTP post-validation"
@@ -141,7 +142,8 @@ COMMANDS = {
         "api_server": {
             "startup": [
                 "./start.sh",
-                "start oentsrv"
+                "istnodeagt start",
+                "start_producer.sh"
             ],
             "post_validation": [
                 "echo Kernel version below:",
@@ -154,8 +156,7 @@ COMMANDS = {
         },
         "wso2_server": {
             "startup": [
-                "./start.sh",
-                "start oentsrv"
+                "/data/wso2/wso2am-3.2.0/bin/wso2server.sh start"
             ],
             "post_validation": [
                 "ps -ef | grep wso2 | grep -v grep"
@@ -164,8 +165,7 @@ COMMANDS = {
         },
         "gui_server": {
             "startup": [
-                "./start.sh",
-                "start oentsrv"
+                "./start.sh"
             ],
             "post_validation": [
                 "echo GUI post-validation"
@@ -174,8 +174,7 @@ COMMANDS = {
         },
         "sftp_server": {
             "startup": [
-                "./start.sh",
-                "start oentsrv"
+                "./start.sh"
             ],
             "post_validation": [
                 "echo SFTP post-validation"
@@ -196,7 +195,7 @@ class ServerManager:
         self.setup_logging()
         self.overall_status = True  # To track overall script status
         self.state_file = os.path.join(STATE_FILE_DIR, f"{self.hostname}_prevalidation_state.json")
-        self.post_validation_state = {
+        self.postvalidation_state = {
             "hostname": self.hostname,
             "processes": [],
             "mailbox_status": "",
@@ -298,17 +297,18 @@ class ServerManager:
 
             if "IST Mail Box up since" in filtered_output:
                 logging.info("IST Mail Box is up and active.")
-                self.post_validation_state["mailbox_status"] = "up"
+                self.postvalidation_state["mailbox_status"] = "up"
                 return True
             elif "Mail box system not active" in filtered_output:
-                self.post_validation_state["mailbox_status"] = "not active"
+                self.postvalidation_state["mailbox_status"] = "not active"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
-                self.post_validation_state["mailbox_status"] = "unexpected output"
+                self.postvalidation_state["mailbox_status"] = "unknown"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Unexpected mailbox status output")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
+            self.postvalidation_state["mailbox_status"] = "failed"
             self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Failed to check mailbox status")
 
     @staticmethod
@@ -361,7 +361,7 @@ class ServerManager:
         msg.attach(MIMEText(body, 'plain'))
 
         # Attach log file
-        with open(log_file, "rb") as attachment):
+        with open(log_file, "rb") as attachment:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment.read())
             encoders.encode_base64(part)
@@ -380,7 +380,7 @@ class ServerManager:
             logging.error(f"Failed to send email notification. Error: {e}")
 
     def execute_commands(self, command_type):
-        """Execute the commands for the given command type (startup or post_validation)."""
+        """Execute the commands for the given command type (startup or post-validation)."""
         if self.client not in COMMANDS or self.server_type not in COMMANDS[self.client]:
             self.log_and_exit(EXIT_UNKNOWN_CLIENT_OR_SERVER, "Unknown client or server type")
 
@@ -524,9 +524,9 @@ class ServerManager:
             if stopped_ports:
                 logging.info("Stopped ports found:\n" + "\n".join(stopped_ports))
 
-        self.post_validation_state["ports"]["disconnected"] = disconnected_ports
-        self.post_validation_state["ports"]["passive"] = passive_ports
-        self.post_validation_state["ports"]["stopped"] = stopped_ports
+        self.postvalidation_state["ports"]["disconnected"] = disconnected_ports
+        self.postvalidation_state["ports"]["passive"] = passive_ports
+        self.postvalidation_state["ports"]["stopped"] = stopped_ports
 
     def _handle_shccmd_output(self, output):
         """Handle the output of shccmd list to check for bins that are down."""
@@ -547,11 +547,11 @@ class ServerManager:
         if down_bins:
             logging.info("Bins found in down status:\n" + "\n".join(down_bins))
 
-        self.post_validation_state["bins_down"] = down_bins
+        self.postvalidation_state["bins_down"] = down_bins
 
     def startup(self):
         """Perform startup tasks."""
-        logging.info("Starting services...")
+        logging.info("Starting up services...")
         self.execute_commands("startup")
 
     def post_validation(self):
@@ -559,7 +559,7 @@ class ServerManager:
         logging.info("Starting post-validation...")
         self._check_processes()
         self.execute_commands("post_validation")
-        self.compare_states()
+        self.compare_pre_post_validation_state()
 
     def _check_processes(self):
         """Check the status of required processes and log the results."""
@@ -567,55 +567,52 @@ class ServerManager:
         for process in processes:
             if is_process_running(process):
                 logging.info(f"Process {process} is running")
-                self.post_validation_state["processes"].append(process)
+                self.postvalidation_state["processes"].append(process)
             else:
                 logging.warning(f"Process {process} is not running")
 
-    def compare_states(self):
+    def compare_pre_post_validation_state(self):
         """Compare pre-validation and post-validation states."""
         try:
             with open(self.state_file, 'r') as f:
                 prevalidation_state = json.load(f)
-            logging.info("Loaded pre-validation state successfully.")
         except Exception as e:
             logging.error(f"Failed to load pre-validation state. Error: {e}")
             self.log_and_exit(EXIT_GENERAL_FAILURE, "Failed to load pre-validation state")
 
-        differences = []
-        
+        mismatches = []
         # Compare processes
-        prevalidation_processes = set(prevalidation_state["processes"])
-        post_validation_processes = set(self.post_validation_state["processes"])
-
-        if prevalidation_processes != post_validation_processes:
-            differences.append("Process state mismatch.")
-            logging.error("Process state mismatch.")
+        pre_processes = set(prevalidation_state["processes"])
+        post_processes = set(self.postvalidation_state["processes"])
+        missing_processes = pre_processes - post_processes
+        new_processes = post_processes - pre_processes
+        if missing_processes:
+            mismatches.append(f"Missing processes after startup: {', '.join(missing_processes)}")
+        if new_processes:
+            mismatches.append(f"New processes found after startup: {', '.join(new_processes)}")
 
         # Compare mailbox status
-        if prevalidation_state["mailbox_status"] != self.post_validation_state["mailbox_status"]:
-            differences.append("Mailbox status mismatch.")
-            logging.error("Mailbox status mismatch.")
+        if prevalidation_state["mailbox_status"] != self.postvalidation_state["mailbox_status"]:
+            mismatches.append(f"Mailbox status mismatch: Pre-validation was {prevalidation_state['mailbox_status']}, post-validation is {self.postvalidation_state['mailbox_status']}")
 
         # Compare ports
-        for port_state in ["disconnected", "passive", "stopped"]:
-            prevalidation_ports = set(prevalidation_state["ports"][port_state])
-            post_validation_ports = set(self.post_validation_state["ports"][port_state])
-            if prevalidation_ports != post_validation_ports:
-                differences.append(f"{port_state.capitalize()} ports state mismatch.")
-                logging.error(f"{port_state.capitalize()} ports state mismatch.")
+        for port_status in ["disconnected", "passive", "stopped"]:
+            pre_ports = set(prevalidation_state["ports"][port_status])
+            post_ports = set(self.postvalidation_state["ports"][port_status])
+            if pre_ports != post_ports:
+                mismatches.append(f"Port status mismatch for {port_status}: Pre-validation was {pre_ports}, post-validation is {post_ports}")
 
-        # Compare bins down
-        prevalidation_bins_down = set(prevalidation_state["bins_down"])
-        post_validation_bins_down = set(self.post_validation_state["bins_down"])
-        if prevalidation_bins_down != post_validation_bins_down:
-            differences.append("Bins down state mismatch.")
-            logging.error("Bins down state mismatch.")
+        # Compare bins
+        pre_bins_down = set(prevalidation_state["bins_down"])
+        post_bins_down = set(self.postvalidation_state["bins_down"])
+        if pre_bins_down != post_bins_down:
+            mismatches.append(f"Bins down mismatch: Pre-validation was {pre_bins_down}, post-validation is {post_bins_down}")
 
-        if differences:
-            logging.error("Post-validation completed with differences.")
+        if mismatches:
+            logging.error("Post-validation mismatches found:\n" + "\n".join(mismatches))
             self.overall_status = False
         else:
-            logging.info("Post-validation completed successfully. All states match.")
+            logging.info("Post-validation checks passed successfully.")
 
     def run(self):
         """Run the specified action (startup or post-validation)."""
