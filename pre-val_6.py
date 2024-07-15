@@ -197,7 +197,7 @@ class ServerManager:
         self.action = action
         self.setup_logging()
         self.overall_status = True  # To track overall script status
-        self.state_file = os.path.join(STATE_FILE_DIR, f"{self.hostname}_{self.action}_state.json")
+        self.state_file = os.path.join(STATE_FILE_DIR, f"{self.hostname}_prevalidation_state.json")
         self.prevalidation_state = {
             "hostname": self.hostname,
             "processes": [],
@@ -306,11 +306,12 @@ class ServerManager:
                 self.prevalidation_state["mailbox_status"] = "not active"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Mailbox is not active")
             else:
-                self.prevalidation_state["mailbox_status"] = "unexpected output"
+                self.prevalidation_state["mailbox_status"] = "unknown"
                 self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Unexpected mailbox status output")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.decode().strip()
             logging.error(f"Failed to check mailbox status. Error:\n{error_output}")
+            self.prevalidation_state["mailbox_status"] = "failed"
             self.log_and_exit(EXIT_MAILBOX_NOT_ACTIVE, "Failed to check mailbox status")
 
     @staticmethod
@@ -557,7 +558,6 @@ class ServerManager:
         self._check_processes()
         self.execute_commands("pre_validation")
         self.save_prevalidation_state()
-        self.shutdown()
 
     def _check_processes(self):
         """Check the status of required processes and log the results."""
