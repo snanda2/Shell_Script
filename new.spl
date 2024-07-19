@@ -1,11 +1,7 @@
 index=index_name sourcetype=source_type source=source_name ("IN_MESSAGE" AND "expiryDate") OR ("OUT_MESSAGE" AND "\"statusCode")
-| rex "UUID.*(?<Transaction_ID>[a-fA-F0-9]{8}[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})"
-| rex "systemTraceNumber\"\:(?<sys_trace>\d+)"
-| rex "\s(?<date>\d+\-\d+\-\d+)"
-| rex "tsToIssuer\":\"(?<Toissuer>\d+\.\d+)\", \s*tsFromIssuer\":\"(?<FromIssuer>\d+\.\d+)"
-| rex "tsToIST\":\"(?<ToIST>\d+\.\d+)\", \s*tsToClient\":\"(?<ToClient>\d+\.\d+)"
-| eval out_cif=round(FromIssuer - Toissuer, 6)
-| eval start=ToIST
-| eval end=ToClient
-| eval resp_time=(end - start) - out_cif
-| stats avg(resp_time) as avg_resp_time by date
+| rex field=_raw "UUID.*(?<Transaction_ID>[a-fA-F0-9]{8}[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})"
+| rex field=_raw "systemTraceNumber\"\:(?<sys_trace>\d+)"
+| rex field=_raw "\s(?<date>\d+\-\d+\-\d+)"
+| rex field=_raw "tsToIssuer\":\"(?<Toissuer>\d+\.\d+)\",\s*tsFromIssuer\":\"(?<FromIssuer>\d+\.\d+)"
+| rex field=_raw "tsToIST\":\"(?<ToIST>\d+\.\d+)\",\s*tsToClient\":\"(?<ToClient>\d+\.\d+)"
+| table Transaction_ID sys_trace date ToIST Toissuer FromIssuer ToClient
